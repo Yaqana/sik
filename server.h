@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <unordered_set>
 #include <set>
+
 #include "siktacka.h"
 #include "data_structures.h"
 
@@ -13,8 +14,8 @@
 class PlayerData {
 public:
 
-    PlayerData(const std::string &player_name, const double &head_x, const double &head_y, int8_t dir) :
-            _player_name(player_name), head_x_(head_x), head_y_(head_y), dir_(dir) {};
+    PlayerData(const std::string &player_name, const double &head_x, const double &head_y, uint32_t dir) :
+            _player_name(player_name), head_x_(head_x), head_y_(head_y), move_dir_(dir) {};
 
     std::string player_name() const { return _player_name; }
 
@@ -22,11 +23,9 @@ public:
 
     double head_y() const { return head_y_; }
 
-    double dir() const { return dir_; }
+    void set_dir(int8_t dir) { turn_dir_ = dir; }
 
-    void set_dir(int8_t dir) { dir_ = dir; }
-
-    void move();
+    void move(uint32_t turningSpeed);
 
     std::pair<int, int> pixel() const { return std::make_pair((int)head_x, (int)head_y_); }
 
@@ -37,7 +36,8 @@ private:
     std::string _player_name;
     double head_x_;
     double head_y_;
-    int8_t dir_;
+    int8_t turn_dir_;
+    uint32_t move_dir_;
     bool active_;
 };
 
@@ -45,8 +45,7 @@ using player_ptr = std::shared_ptr<PlayerData>;
 
 class GameState {
 public:
-    GameState(time_t rand_seed, uint32_t maxx, uint32_t maxy) :
-            rand_(rand_seed), maxx_(maxx), maxy_(maxy) {};
+    GameState(time_t rand_seed, uint32_t maxx, uint32_t maxy, uint32_t turningSpeed);
 
     void new_player(const std::string &p);
 
@@ -62,6 +61,7 @@ private:
     std::set<player_ptr, SortPlayers> players_;
     std::vector<event_ptr> events_;
     bool active_ = false;
+    uint32_t turningSpeed_;
 
     //przechowuje informacje o stanie planszy
     //byc moze unordered_map jesli trzeba bedzie trzymac gracza

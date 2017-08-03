@@ -1,14 +1,19 @@
+#include <cmath>
+
 #include "server.h"
 
-void PlayerData::move() {
+#define NDEGREES 360
 
+void PlayerData::move(uint32_t turningSpeed) {
+    move_dir_ = (move_dir_ + turningSpeed) % NDEGREES;
+    head_x_ += cos(move_dir_);
+    head_y_ += sin(move_dir_);
 }
 
-GameState::GameState(time_t rand_seed, uint32_t maxx, uint32_t maxy):
-    rand_(Random(rand_seed)), maxx_(maxx), maxy_(maxy) {
+GameState::GameState(time_t rand_seed, uint32_t maxx, uint32_t maxy, uint32_t turningSpeed):
+    rand_(Random(rand_seed)), maxx_(maxx), maxy_(maxy), turningSpeed_(turningSpeed) {
     gid_ = rand();
 }
-
 
 void GameState::new_player(const std::string &p) {
     players_.insert(std::make_shared(
@@ -56,10 +61,10 @@ std::vector<event_ptr> GameState::nextTurn() {
     for (auto &player : players_) {
         if (player->active()) {
             std::pair<int, int> oldCoord = player->pixel();
-            player->move();
+            player->move(turningSpeed_);
             std::pair<int, int> newCoord = player->pixel();
-            if (newCoord.first < 0 || newCoord.first > maxx_
-                || newCoord.second < 0 || newCoord.second > maxy_) {
+            if (newCoord.first < 0 || newCoord.first >= maxx_
+                || newCoord.second < 0 || newCoord.second >= maxy_) {
                 // TODO PLAYER_ELIMINATED
             } else if (oldCoord.first != newCoord.first || oldCoord.second != newCoord.second) {
                 // TODO generuj pixel

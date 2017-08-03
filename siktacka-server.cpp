@@ -6,6 +6,7 @@
 #include <netinet/in.h>
 #include <iostream>
 #include <unordered_map>
+#include <poll.h>
 #include "err.h"
 #include "siktacka.h"
 #include "server.h"
@@ -20,6 +21,15 @@ namespace {
 
     std::shared_ptr<GameState> gstate;
 
+    uint32_t width = 800;
+    uint32_t height = 600;
+    uint16_t port = 12345;
+    uint32_t speed = 50;
+    uint32_t turning_speed = 6;
+    time_t seed;
+    int wait_time_us;
+    int wait_time_ms;
+
     int32_t is_positive_int(char *string) {
         char *temp = string;
         while (*temp) {
@@ -29,10 +39,7 @@ namespace {
         return atoi(string);
     }
 
-    void parse_arguments(int argc, char **argv, uint32_t &width, uint32_t &height,
-                         uint16_t &port, uint32_t &speed, uint32_t &turning_speed,
-                         time_t &seed
-    ) {
+    void parse_arguments(int argc, char **argv) {
         int opt;
         int p;
         while ((opt = getopt(argc, argv, "W:H:p:s:t:r:")) != -1) {
@@ -62,7 +69,8 @@ namespace {
                     fatal("niepoprawna flaga %c \n", opt);
             }
         }
-
+        wait_time_us = 1000000 / turning_speed;
+        wait_time_ms = wait_time_us / 1000;
     }
 
     void udp_socket(int &sock, uint16_t port) {
@@ -81,7 +89,7 @@ namespace {
         auto client = clients.find(player_address);
 
         // nowe gniazdo, klient o znanej nazwie
-        if (client == clients.end() && gstate->exist_player(data->player_name))
+        if (client == clients.end() && gstate->exist_player(data->player_name()))
             return;
 
         // poprawny nowy klient
@@ -92,11 +100,6 @@ namespace {
         else if (client->second > data->session_id())
             return;
 
-        // zgłaszamy gotowość do gry
-        if (!gstate->is_active() && data->turn_direction() != 0) {
-            if (gstate->new_player(data->player_name())) { //TODO
-            } // zaczyna sie nowa gra
-        }
     }
 
     void snd_and_recv(int sock) {
@@ -104,22 +107,22 @@ namespace {
         socklen_t snda_len, rcva_len;
         int flags, sflags;
         ssize_t len = 1;
-        while (len >= 0) { //TODO warunek
-            char client_datagram[SERVER_SEND_SIZE];
-            rcva_len = (socklen_t) sizeof(player_address);
-            flags = 0;
-            len = recvfrom(sock, client_datagram, sizeof(client_datagram), flags,
-                           (struct sockaddr*) &player_address, &rcva_len);
-            if (len < 0)
-                syserr("error on datagram from client socket");
+        struct pollfd client;
+        client.fd = sock;
+        client.events = POLLIN | POLLOUT;
+        int ret, to_wait;
+        to_wait = wait_time_ms;
+        uint64_t next_send = get_timestamp() + wait_time_us;
+        while(true) { //TODO
+            client.revents = 0;
+            ret = poll(&client, 1, to_wait);
+            if (ret < 1) {
+                next_send = get_timestamp() + wait_time_us;
+                //TODO wyslac wszystko co trzeba
+                to_wait = wait_time_ms;
+            }
             else {
-                /*(void) printf("read from socket: %zd bytes: %.*s\n", len,
-                              (int) len, client_datagram);*/
-                cdata_ptr data = buffer_to_client_data(client_datagram, len);
-                std::cout<<"name: "<<data->player_name<<"\n";
-                printf("diretion %d\n", data->turn_direction());
-                printf("session %llu\n", data->session_id());
-                printf("next %d\n", data->next_event());
+                //TODO cos dostalismy
             }
         }
     }
@@ -127,15 +130,9 @@ namespace {
 }
 int main(int argc, char *argv[]) {
 
-    uint32_t width = 800;
-    uint32_t height = 600;
-    uint16_t port = 12345;
-    uint32_t speed = 50;
-    uint32_t turning_speed = 6;
-    time_t seed = time(NULL);
+    seed = time(NULL);
 
-    parse_arguments(
-            argc, argv, width, height, port, speed, turning_speed, seed);
+    parse_arguments(argc, argv);
 
     gstate = std::make_shared<GameState>(seed);
 

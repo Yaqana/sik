@@ -12,14 +12,21 @@
 #include "siktacka.h"
 #include "data_structures.h"
 
-#define UI 0
-#define SERVER 1
-
 namespace {
+    const int UI = 0;
+    const int SERVER = 1;
+    const int SEND_INTERVAL_ms = 20; // co ile wysylany jest komunikat
+    const int SEND_INTERVAL_us = 20000;
+    const int LEFT = -1;
+    const int AHEAD = 0;
+    const int RIGHT = 1;
     std::vector<std::string> players;
     std::queue<event_ptr> events;
+    std::string player_name, server;
+    uint16_t server_port = 12345;
+    uint16_t ui_port = 12346;
+    std::string ui_server = "localhost";
 }
-
 
 void parse_port(const std::string &to_parse, std::string &server, uint16_t &port){
     unsigned long pos = to_parse.find(":");
@@ -33,8 +40,7 @@ void parse_port(const std::string &to_parse, std::string &server, uint16_t &port
         port = validate_port(p);
 }
 
-int parse_arguments(int argc, char* argv[], std::string &player_name, std::string &server,
-                    uint16_t &server_port, std::string &ui_server, uint16_t &ui_port){
+int parse_arguments(int argc, char* argv[]){
     player_name = argv[1];
     parse_port(argv[2], server, server_port);
     if(argc > 3) {
@@ -65,13 +71,13 @@ int ui_read(int sock, char* buffer, cdata_ptr data){
         return 1;
     }
     if(strcmp(buffer, "LEFT_KEY_DOWN\n") == 0) {
-        data->set_turn_direction(-1);
+        data->set_turn_direction(LEFT);
     }
     else if (strcmp(buffer, "RIGHT_KEY_DOWN\n")== 0) {
-        data->set_turn_direction(1);
+        data->set_turn_direction(RIGHT);
     }
     else
-        data->set_turn_direction(0);
+        data->set_turn_direction(AHEAD);
     return 0;
 }
 
@@ -186,11 +192,7 @@ int main(int argc, char* argv[]) {
     if (argc < 3)
         fatal("za malo argumentow\n");
 
-    std::string player_name, server;
-    uint16_t server_port = 12345;
-    uint16_t ui_port = 12346;
-    std::string ui_server = "localhost";
-    int ret = parse_arguments(argc, argv, player_name, server, server_port, ui_server, ui_port);
+    int ret = parse_arguments(argc, argv);
     if (ret < 0)
         fatal("Invalid arguments");
     std::cout<<player_name<<" "<<server<<" "<<server_port<<" "<<ui_server<<" "<<ui_port<<"\n";
@@ -221,8 +223,8 @@ int main(int argc, char* argv[]) {
     client[UI].revents = 0;
 
     int active_players = 0;
-    uint64_t next_send = get_timestamp() + 20000;
-    int to_wait = 20;
+    uint64_t next_send = get_timestamp() + SEND_INTERVAL_us;
+    int to_wait = SEND_INTERVAL_ms;
 
     const std::string example_buffer = "NEW_GAME 800 600 ala magda\n";
 
@@ -235,7 +237,7 @@ int main(int argc, char* argv[]) {
         client[SERVER].revents = 0;
         ret = poll(client, 2, to_wait);
         if(ret < 1) {
-            next_send = get_timestamp() + 20000;
+            next_send = get_timestamp() + SEND_INTERVAL_us;
             server_send(server_sock, data, &server_address);
             ret=1; // TODO taka sztuczna petla
             to_wait=20;
