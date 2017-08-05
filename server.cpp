@@ -75,3 +75,19 @@ std::vector<event_ptr> GameState::nextTurn() {
         }
     }
 };
+
+sdata_ptr GameState::eventsToSend(uint32_t firstEvent) {
+    std::vector<event_ptr> events(events_.begin()+firstEvent, events_.end());
+    sdata_ptr serverData(new ServerData(gid_, std::move(events)));
+    return serverData;
+}
+
+void Client::sendTo(char *buffer, size_t len, int sock) const {
+    socklen_t snda_len = (socklen_t)sizeof(addres_);
+    int flags = 0;
+    ssize_t snd_len = sendto(sock, buffer, len, flags,
+                             (struct sockaddr *)&addres_, snda_len);
+    if (snd_len != len){
+        syserr("error in sending datagram to client socket");
+    }
+}

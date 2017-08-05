@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <stdlib.h>
 #include <netdb.h>
 #include <errno.h>
@@ -223,7 +224,7 @@ int main(int argc, char* argv[]) {
     client[UI].revents = 0;
 
     int active_players = 0;
-    uint64_t next_send = get_timestamp() + SEND_INTERVAL_us;
+    int64_t next_send = get_timestamp() + SEND_INTERVAL_us;
     int to_wait = SEND_INTERVAL_ms;
 
     const std::string example_buffer = "NEW_GAME 800 600 ala magda\n";
@@ -257,11 +258,7 @@ int main(int argc, char* argv[]) {
                 server_read(server_sock, &server_address, ui_sock, next_event, active_players);
                 data->set_next_event(next_event);
             }
-            uint64_t t= get_timestamp();
-            if (t >= next_send)
-                to_wait=0;
-            else
-                to_wait = (next_send - t)/1000;
+            to_wait = std::max((next_send - get_timestamp())/1000, 0);
         }
     }
 

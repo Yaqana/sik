@@ -1,10 +1,10 @@
 #include "siktacka.h"
 
-uint64_t get_timestamp(){
+int64_t get_timestamp(){
     struct timeval tv;
     gettimeofday(&tv,NULL);
     long long time_in_micros = 1000000 * tv.tv_sec + tv.tv_usec;
-    return (uint64_t)time_in_micros;
+    return time_in_micros;
 }
 
 uint16_t validate_port(const std::string &port){

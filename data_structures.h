@@ -7,6 +7,8 @@
 #include <memory>
 #include <iostream>
 
+#include "siktacka.h"
+
 #define htonll(x) ((1==htonl(1)) ? (x) : ((uint64_t)htonl((x) & 0xFFFFFFFF) << 32) | htonl((x) >> 32))
 #define ntohll(x) ((1==ntohl(1)) ? (x) : ((uint64_t)ntohl((x) & 0xFFFFFFFF) << 32) | ntohl((x) >> 32))
 
@@ -63,60 +65,73 @@ typedef struct _event {
 class Event {
 public:
     virtual size_t toGuiBuffer(char* buffer) = 0;
+    size_t toServerBuffer(char* buffer);
     uint32_t event_no() { return event_no_; }
+    virtual uint8_t event_type() = 0;
 protected:
     uint32_t len_; // czy potrzebne?
     uint32_t event_no_;
     uint32_t crc32_;
+private:
+    virtual size_t dataToBuffer(char* buffer) = 0;
 };
 
 class NewGame: public Event {
 public:
     NewGame(char* buffer, size_t len, uint32_t event_no);
     NewGame(uint32_t maxx, uint32_t maxy, const std::vector<std::string> &players, uint32_t event_no);
-    size_t toGuiBuffer(char* buffer);
+    size_t toGuiBuffer(char* buffer) override;
+    uint8_t event_type() override {return 0;}
 private:
     uint32_t maxx_;
     uint32_t maxy_;
     std::vector<std::string> players_;
+    size_t dataToBuffer(char* buffer) override;
 };
 
 class Pixel: public Event {
 public:
     Pixel(char* buffer, size_t len, uint32_t event_no);
-    size_t toGuiBuffer(char* buffer);
+    size_t toGuiBuffer(char* buffer) override;
+    uint8_t event_type() override {return 1;};
 private:
-    uint32_t _x;
-    uint32_t _y;
-    uint8_t _playerNumber;
+    uint32_t x_;
+    uint32_t y_;
+    uint8_t playerNumber_;
+    size_t dataToBuffer(char* buffer) override;
 };
 
 class PlayerEliminated: public Event {
 public:
     PlayerEliminated(char* buffer, size_t len, uint32_t event_no);
-    size_t toGuiBuffer(char* buffer);
+    size_t toGuiBuffer(char* buffer) override;
+    uint8_t event_type() override {return 2;};
 private:
-    uint8_t _playerNumber;
+    uint8_t playerNumber_;
+    size_t dataToBuffer(char* buffer) override;
 };
 
 class GameOver: public Event {
 public:
     GameOver();
     size_t toGuiBuffer(char* buffer);
+    uint8_t event_type() override {return 3;};
+    size_t dataToBuffer(char* buffer) override;
 };
 
 using event_ptr = std::shared_ptr<Event>;
 
 class ServerData {
 public:
-    ServerData(uint32_t game_id, const std::vector<event_ptr> events):
-            _game_id(game_id), _events(events) {};
-    bool hasEvents() const { return _events.size() > 0; }
-    uint32_t firstEvent() const { return hasEvents() ? _events[0]->event_no() : 0; }
-    std::vector<event_ptr> events() const { return _events; }
+    ServerData(uint32_t game_id, const std::vector<event_ptr> &events):
+            game_id_(game_id), events_(events) {};
+    bool hasEvents() const { return events_.size() > 0; }
+    uint32_t firstEvent() const { return hasEvents() ? events_[0]->event_no() : 0; }
+    std::vector<event_ptr> events() const { return events_; }
+    size_t toBuffer(char* buffer) const;
 private:
-    uint32_t _game_id;
-    std::vector<event_ptr> _events;
+    uint32_t game_id_;
+    std::vector<event_ptr> events_;
 };
 
 typedef  std::shared_ptr<ServerData> sdata_ptr;

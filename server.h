@@ -15,12 +15,24 @@ class Client{
 public:
     Client(const struct sockaddr_in &addres, int64_t session_id):
             addres_(addres), session_id_(session_id) {};
-    void sendTo(char* buffer);
-    int64_t session_id() { return session_id_; }
+    void sendTo(char *buffer, size_t len, int sock) const;
+    int64_t session_id() const { return session_id_; }
 
 private:
     struct sockaddr_in addres_;
     int64_t session_id_;
+};
+
+class SendData {
+public:
+    SendData(char* buffer, size_t len, const Client& client, int sock):
+            buffer_(buffer), len_(len), client_(client), sock_(sock) {}
+    void send() const { client_.sendTo(buffer_, len_, sock_);};
+private:
+    char* buffer_;
+    size_t len_;
+    const Client &client_;
+    int sock_;
 };
 
 class PlayerData {
@@ -80,6 +92,10 @@ public:
     std::vector<event_ptr> nextTurn();
 
     void processData(cdata_ptr data);
+
+    sdata_ptr eventsToSend(uint32_t firstEvent);
+
+    bool active() const { return active_; }
 
 
 private:

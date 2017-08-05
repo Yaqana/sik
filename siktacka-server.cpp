@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstdint>
 #include <getopt.h>
 #include <cctype>
@@ -6,6 +7,7 @@
 #include <iostream>
 #include <unordered_map>
 #include <poll.h>
+#include <queue>
 #include "err.h"
 #include "siktacka.h"
 #include "server.h"
@@ -19,6 +21,8 @@ namespace {
     std::unordered_map<unsigned long, Client> clients; // address - session_id
 
     std::shared_ptr<GameState> gstate;
+
+    std::queue<SendData> toSend;
 
     uint32_t width = 800;
     uint32_t height = 600;
@@ -87,30 +91,36 @@ namespace {
 
     void process_cdata(const struct sockaddr_in &player_address, cdata_ptr data) {
         std::cout<<data->player_name()<<" "<<data->next_event()<<" "<<data->session_id()<<"\n"; // TODO
-        auto client = clients.find(player_address.sin_addr.s_addr);
+        auto itr = clients.find(player_address.sin_addr.s_addr);
 
         // nowe gniazdo, klient o znanej nazwie
-        if (client == clients.end() && gstate->exist_player(data->player_name())) {
+        if (itr == clients.end() && gstate->exist_player(data->player_name())) {
             std::cout<<"Istnieje już gracz o takim nicku\n";
             return;
         }
 
         // zbyt stare session_id
-        if (client->second.session_id() > data->session_id()) {
+        if (itr->second.session_id() > data->session_id()) {
             std::cout<<"Nieaktualny datagram";
             return;
         }
 
         // poprawny nowy klient
-        if (client == clients.end() || client->second.session_id() < data->session_id()) {
+        if (itr == clients.end() || itr->second.session_id() < data->session_id()) {
             Client c(player_address, data->session_id());
-            clients.insert(std::make_pair(player_address.sin_addr.s_addr, std::move(c)));
+            *itr = std::make_pair(player_address.sin_addr.s_addr, std::move(c));
+            clients.insert(*itr);
             std::cout<<"Tworzenie nowego gracza\n";
         }
 
+        gstate->processData(data);
 
-
-        // TODO tutaj przetworzyć komunika od klienta
+        const Client &c = itr->second;
+        sdata_ptr events_to_send = gstate->eventsToSend(data->next_event());
+        char buffer[SERVER_TO_CLIENT_SIZE];
+        size_t len = events_to_send->toBuffer(buffer);
+        SendData s(buffer, len, c, sock);
+        toSend.push(std::move(s));
 
     }
 
@@ -128,7 +138,9 @@ namespace {
     }
 
     void write_to_client() {
-
+        const SendData &sendData = toSend.front();
+        toSend.pop();
+        sendData.send();
     }
 
     void snd_and_recv(int sock) {
@@ -141,13 +153,14 @@ namespace {
         client.events = POLLIN;
         int ret, to_wait;
         to_wait = wait_time_ms;
-        uint64_t next_send = get_timestamp() + wait_time_us;
+        int64_t next_send = get_timestamp() + wait_time_us;
         while(true) { //TODO
             client.revents = 0;
             ret = poll(&client, 1, to_wait);
             if (ret < 1) {
                 next_send = get_timestamp() + wait_time_us;
-                //gstate->nextTurn();
+                if(gstate->active())
+                    gstate->nextTurn();
                 to_wait = wait_time_ms;
             }
             else {
@@ -155,8 +168,9 @@ namespace {
                     read_from_client();
                 }
                 else if (client.revents & POLLOUT) {
-                    // TODO pisanie do klienta
+                    write_to_client();
                 }
+                to_wait = std::max((next_send - get_timestamp())/1000, 0);
             }
         }
     }

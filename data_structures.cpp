@@ -22,12 +22,12 @@ size_t NewGame::toGuiBuffer(char* buffer) {
 };
 
 size_t Pixel::toGuiBuffer(char *buffer) {
-    sprintf(buffer, "PIXEL %u %u %u\n", _x, _y, _playerNumber);
+    sprintf(buffer, "PIXEL %u %u %u\n", x_, y_, playerNumber_);
     return strlen(buffer);
 }
 
 size_t PlayerEliminated::toGuiBuffer(char *buffer) {
-    sprintf(buffer, "PLAYER_ELIMINATED %u\n", _playerNumber);
+    sprintf(buffer, "PLAYER_ELIMINATED %u\n", playerNumber_);
     return strlen(buffer);
 }
 
@@ -175,18 +175,18 @@ Pixel::Pixel(char *buffer, size_t len, uint32_t event_no) {
     event_no_ = event_no;
     size_t ptr = 0;
     uint32_t x, y;
-    memcpy(&_playerNumber, buffer, 1);
+    memcpy(&playerNumber_, buffer, 1);
     ptr += 1;
     memcpy(&x, buffer + ptr, 4);
-    _x = ntohl(x);
+    x_ = ntohl(x);
     ptr += 4;
     memcpy(&y, buffer + ptr, 4);
-    _y = ntohl(y);
+    y_ = ntohl(y);
 }
 
 PlayerEliminated::PlayerEliminated(char *buffer, size_t len, uint32_t event_no) {
     event_no_ = event_no;
-    memcpy(&_playerNumber, buffer, 1);
+    memcpy(&playerNumber_, buffer, 1);
 }
 
 GameOver::GameOver() {};
@@ -268,3 +268,59 @@ size_t event_to_gui_buffer(event_ptr event, char *buffer) {
 }
 
 */
+
+size_t ServerData::toBuffer(char *buffer) const {
+    size_t i = 0;
+    uint32_t game_id = htonl(game_id_);
+    memcpy(buffer, &game_id, 4);
+    i = 4;
+    for(auto &ev: events_) {
+        char ev_buffer[EVENT_BUFFER_SIZE];
+        size_t len = ev->toServerBuffer(ev_buffer);
+        memcpy(buffer + i, &ev_buffer, len);
+        i += len;
+    }
+    return i;
+}
+
+size_t Event::toServerBuffer(char *buffer) {
+    uint32_t event_no = htonl(event_no_);
+    uint8_t event_type = event_type();
+    memcpy(buffer+4, &event_no, 4);
+    memcpy(buffer+8, &event_type, 1);
+    const size_t offset = 4;
+    uint32_t len = 5;
+    len += dataToBuffer(buffer+9);
+    size_t len_hton = htonl(len);
+    memcpy(buffer, &len_hton, 4);
+    return len + 8; //TODO crc
+}
+
+size_t NewGame::dataToBuffer(char *buffer) {
+    uint32_t len = 0;
+    for (auto &p : players_) {
+        const char* pname = p.c_str();
+        memcpy(buffer+len, &pname, p.length());
+        memcpy(buffer+len+1, "\0", 1);
+        len += p.length() + 1;
+    }
+    return len;
+}
+
+size_t Pixel::dataToBuffer(char *buffer) {
+    memcpy(buffer, &playerNumber_, 1);
+    uint32_t x = htonl(x_);
+    uint32_t y = htonl(y_);
+    memcpy(buffer + 1, &x, 4);
+    memcpy(buffer + 5, &y, 4);
+    return 9;
+}
+
+size_t PlayerEliminated::dataToBuffer(char *buffer) {
+    memcpy(buffer, &playerNumber_, 1);
+    return 1;
+}
+
+size_t GameOver::dataToBuffer(char *buffer) {
+    return 0;
+}
