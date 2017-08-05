@@ -258,7 +258,7 @@ int main(int argc, char* argv[]) {
                 server_read(server_sock, &server_address, ui_sock, next_event, active_players);
                 data->set_next_event(next_event);
             }
-            to_wait = std::max((next_send - get_timestamp())/1000, 0);
+            to_wait = std::max((next_send - get_timestamp())/1000, (int64_t)0);
         }
     }
 

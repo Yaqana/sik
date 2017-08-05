@@ -8,7 +8,7 @@
 #define GAME_OVER 3
 
 NewGame::NewGame(uint32_t maxx, uint32_t maxy, const std::vector<std::string> &players, uint32_t event_no)
-        : maxx_(maxx), maxy_(maxy), players_(players), event_no_(event_no) {};
+        : maxx_(maxx), maxy_(maxy), players_(players) { event_no_ = event_no; };
 
 size_t NewGame::toGuiBuffer(char* buffer) {
     size_t ptr = 0;
@@ -169,6 +169,7 @@ NewGame::NewGame(char *buffer, size_t len, uint32_t event_no) {
         count = 0;
         players_.push_back(player);
     }
+    event_type_=0;
 }
 
 Pixel::Pixel(char *buffer, size_t len, uint32_t event_no) {
@@ -182,14 +183,16 @@ Pixel::Pixel(char *buffer, size_t len, uint32_t event_no) {
     ptr += 4;
     memcpy(&y, buffer + ptr, 4);
     y_ = ntohl(y);
+    event_type_=1;
 }
 
 PlayerEliminated::PlayerEliminated(char *buffer, size_t len, uint32_t event_no) {
     event_no_ = event_no;
     memcpy(&playerNumber_, buffer, 1);
+    event_type_=2;
 }
 
-GameOver::GameOver() {};
+GameOver::GameOver() { event_type_=3; };
 
 event_ptr buffer_to_event(char* buffer, size_t len) {
     uint32_t ptr = 0;
@@ -285,9 +288,8 @@ size_t ServerData::toBuffer(char *buffer) const {
 
 size_t Event::toServerBuffer(char *buffer) {
     uint32_t event_no = htonl(event_no_);
-    uint8_t event_type = event_type();
     memcpy(buffer+4, &event_no, 4);
-    memcpy(buffer+8, &event_type, 1);
+    memcpy(buffer+8, &event_type_, 1);
     const size_t offset = 4;
     uint32_t len = 5;
     len += dataToBuffer(buffer+9);

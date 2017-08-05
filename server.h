@@ -25,13 +25,13 @@ private:
 
 class SendData {
 public:
-    SendData(char* buffer, size_t len, const Client& client, int sock):
+    SendData(char* buffer, size_t len, std::shared_ptr<Client> client, int sock):
             buffer_(buffer), len_(len), client_(client), sock_(sock) {}
-    void send() const { client_.sendTo(buffer_, len_, sock_);};
+    void send() const { client_->sendTo(buffer_, len_, sock_);};
 private:
     char* buffer_;
     size_t len_;
-    const Client &client_;
+    std::shared_ptr<Client> client_;
     int sock_;
 };
 

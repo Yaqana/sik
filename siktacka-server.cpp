@@ -18,7 +18,7 @@ extern int optind, opterr, optopt;
 
 namespace {
 
-    std::unordered_map<unsigned long, Client> clients; // address - session_id
+    std::unordered_map<unsigned long, std::shared_ptr<Client>> clients; // address - session_id
 
     std::shared_ptr<GameState> gstate;
 
@@ -73,7 +73,7 @@ namespace {
                     fatal("niepoprawna flaga %c \n", opt);
             }
         }
-        wait_time_us = 1000000 / turning_speed;
+        wait_time_us = 1000000 / speed;
         wait_time_ms = wait_time_us / 1000;
     }
 
@@ -100,22 +100,24 @@ namespace {
         }
 
         // zbyt stare session_id
-        if (itr->second.session_id() > data->session_id()) {
+        if (itr->second->session_id() > data->session_id()) {
             std::cout<<"Nieaktualny datagram";
             return;
         }
 
+        std::shared_ptr<Client> c;
         // poprawny nowy klient
-        if (itr == clients.end() || itr->second.session_id() < data->session_id()) {
-            Client c(player_address, data->session_id());
-            *itr = std::make_pair(player_address.sin_addr.s_addr, std::move(c));
-            clients.insert(*itr);
+        if (itr == clients.end() || itr->second->session_id() < data->session_id()) {
+            c = std::make_shared<Client>(player_address, data->session_id());
+            clients.insert(std::make_pair(player_address.sin_addr.s_addr, c));
             std::cout<<"Tworzenie nowego gracza\n";
+        }
+        else {
+            c = itr->second;
         }
 
         gstate->processData(data);
 
-        const Client &c = itr->second;
         sdata_ptr events_to_send = gstate->eventsToSend(data->next_event());
         char buffer[SERVER_TO_CLIENT_SIZE];
         size_t len = events_to_send->toBuffer(buffer);
@@ -170,7 +172,7 @@ namespace {
                 else if (client.revents & POLLOUT) {
                     write_to_client();
                 }
-                to_wait = std::max((next_send - get_timestamp())/1000, 0);
+                to_wait = std::max((next_send - get_timestamp())/1000, (int64_t )0);
             }
         }
     }

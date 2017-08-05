@@ -34,7 +34,7 @@ player_ptr GameState::newPlayer(const std::string &player_name) {
 
 void GameState::startGame() {
     active_ = true;
-    std::vector players(ready_players_.begin(), ready_players_.end());
+    std::vector<std::string> players(ready_players_.begin(), ready_players_.end());
     event_ptr event(new NewGame(maxx_, maxy_, std::move(players), events_.size()));
     events_.push_back(event);
 }
