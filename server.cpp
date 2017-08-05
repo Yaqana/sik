@@ -15,54 +15,57 @@ GameState::GameState(time_t rand_seed, uint32_t maxx, uint32_t maxy, uint32_t tu
     gid_ = rand();
 }
 
-void GameState::new_player(const std::string &p) {
-    players_.insert(std::make_shared(
-            new PlayerData(p, rand()%maxx_, rand()%maxy_, rand()%360)));
-    if (players_.size() == 2) {
-        active_ = true;
-        startGame();
-    }
-}
 
 bool GameState::exist_player(const std::string &player_name) const {
     for (auto &p : players_) {
-        if (p->player_name() == player_name)
+        if (p.first == player_name)
             return true;
     }
     return false;
 }
 
-
-struct GameState::SortPlayers {
-    int operator()(const player_ptr p1, const player_ptr p2) const {
-        return p1->player_name().compare(p2->player_name());
-    }
-};
-
-event_ptr GameState::newPlayer(const std::string &player_name) {
+player_ptr GameState::newPlayer(const std::string &player_name) {
     player_ptr player = std::make_shared<PlayerData>(
             player_name, (double)(rand() % maxx_) + 0.5,
             (double)(rand() % maxy_) + 0.5, rand() % 360);
-    players_.insert(player);
-    if (active_) {
-        // TODO wygenerowac zdarzenie dla tego gracza
-    }
-    else if (players_.size() == 2) {
-        startGame();
-    }
+    players_.insert(std::make_pair(player_name, player));
+    return player;
 }
 
 void GameState::startGame() {
     active_ = true;
+    std::vector players(ready_players_.begin(), ready_players_.end());
+    event_ptr event(new NewGame(maxx_, maxy_, std::move(players), events_.size()));
+    events_.push_back(event);
+}
+
+void GameState::processData(cdata_ptr data) {
+    auto it = players_.find(data->player_name());
+    player_ptr player;
+    if (it == players_.end()){
+        player = newPlayer(data->player_name());
+    }
+    else {
+        player = it->second;
+    }
+    if (data->turn_direction() != 0) {
+        auto ready = ready_players_.find(data->player_name());
+        if (ready == ready_players_.end()) {
+            ready_players_.insert(data->player_name());
+            if (ready_players_.size() == 2)
+                startGame();
+        }
+    }
+    player->set_dir(data->turn_direction());
 }
 
 std::vector<event_ptr> GameState::nextTurn() {
     std::vector<event_ptr> eventsGenerated;
     for (auto &player : players_) {
-        if (player->active()) {
-            std::pair<int, int> oldCoord = player->pixel();
-            player->move(turningSpeed_);
-            std::pair<int, int> newCoord = player->pixel();
+        if (player.second->active()) {
+            std::pair<int, int> oldCoord = player.second->pixel();
+            player.second->move(turningSpeed_);
+            std::pair<int, int> newCoord = player.second->pixel();
             if (newCoord.first < 0 || newCoord.first >= maxx_
                 || newCoord.second < 0 || newCoord.second >= maxy_) {
                 // TODO PLAYER_ELIMINATED
@@ -71,6 +74,4 @@ std::vector<event_ptr> GameState::nextTurn() {
             }
         }
     }
-}
-
 };

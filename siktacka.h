@@ -9,9 +9,9 @@
 // #include "data_structures.h"
 
 #define UI_SEND_SIZE 64
-#define UI_RECEIVE_SIZE 30
-#define SERVER_SEND_SIZE 80
-#define SERVER_RECEIVE_SIZE 512
+#define UI_TO_CLIENT_SIZE 30
+#define CLIENT_TO_SERVER_SIZE 80
+#define SERVER_TO_CLIENT_SIZE 512
 #define MAX_PLAYERS 42
 
 uint64_t get_timestamp();

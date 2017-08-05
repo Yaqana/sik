@@ -63,21 +63,22 @@ typedef struct _event {
 class Event {
 public:
     virtual size_t toGuiBuffer(char* buffer) = 0;
-    uint32_t event_no() { return _event_no; }
+    uint32_t event_no() { return event_no_; }
 protected:
-    uint32_t _len; // czy potrzebne?
-    uint32_t _event_no;
-    uint32_t _crc32;
+    uint32_t len_; // czy potrzebne?
+    uint32_t event_no_;
+    uint32_t crc32_;
 };
 
 class NewGame: public Event {
 public:
     NewGame(char* buffer, size_t len, uint32_t event_no);
+    NewGame(uint32_t maxx, uint32_t maxy, const std::vector<std::string> &players, uint32_t event_no);
     size_t toGuiBuffer(char* buffer);
 private:
-    uint32_t _maxx;
-    uint32_t _maxy;
-    std::vector<std::string> _players;
+    uint32_t maxx_;
+    uint32_t maxy_;
+    std::vector<std::string> players_;
 };
 
 class Pixel: public Event {

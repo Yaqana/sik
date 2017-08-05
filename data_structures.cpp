@@ -7,10 +7,13 @@
 #define PLAYER_ELIMINATED 2
 #define GAME_OVER 3
 
+NewGame::NewGame(uint32_t maxx, uint32_t maxy, const std::vector<std::string> &players, uint32_t event_no)
+        : maxx_(maxx), maxy_(maxy), players_(players), event_no_(event_no) {};
+
 size_t NewGame::toGuiBuffer(char* buffer) {
     size_t ptr = 0;
-    sprintf(buffer, "NEW_GAME %u %u ", _maxx, _maxy);
-    for (auto &p : _players) {
+    sprintf(buffer, "NEW_GAME %u %u ", maxx_, maxy_);
+    for (auto &p : players_) {
         ptr += sprintf(buffer + ptr, "%s\0", p.c_str());
     }
     ptr = strlen(buffer);
@@ -145,7 +148,7 @@ event_ptr buffer_to_event(char *buffer, size_t len) { // trzeba bedzie wywalic
 */
 
 NewGame::NewGame(char *buffer, size_t len, uint32_t event_no) {
-    _event_no = event_no;
+    event_no_ = event_no;
     size_t ptr = 0;
     uint32_t x, y;
     memcpy(&x, buffer + ptr, 4);
@@ -153,8 +156,8 @@ NewGame::NewGame(char *buffer, size_t len, uint32_t event_no) {
     memcpy(&y, buffer + ptr, 4);
     ptr += 4;
     size_t count = 0;
-    _maxx = ntohl(x);
-    _maxy = ntohl(y);
+    maxx_ = ntohl(x);
+    maxy_ = ntohl(y);
     while (ptr < len) {
         while (*(buffer + ptr + count) >= 33 && *(buffer + ptr + count) <= 126) {
             count += 1;
@@ -164,12 +167,12 @@ NewGame::NewGame(char *buffer, size_t len, uint32_t event_no) {
         count++;
         ptr += count;
         count = 0;
-        _players.push_back(player);
+        players_.push_back(player);
     }
 }
 
 Pixel::Pixel(char *buffer, size_t len, uint32_t event_no) {
-    _event_no = event_no;
+    event_no_ = event_no;
     size_t ptr = 0;
     uint32_t x, y;
     memcpy(&_playerNumber, buffer, 1);
@@ -182,7 +185,7 @@ Pixel::Pixel(char *buffer, size_t len, uint32_t event_no) {
 }
 
 PlayerEliminated::PlayerEliminated(char *buffer, size_t len, uint32_t event_no) {
-    _event_no = event_no;
+    event_no_ = event_no;
     memcpy(&_playerNumber, buffer, 1);
 }
 

@@ -3,7 +3,6 @@
 #include <cctype>
 #include <cstdlib>
 #include <cstdio>
-#include <netinet/in.h>
 #include <iostream>
 #include <unordered_map>
 #include <poll.h>
@@ -17,7 +16,7 @@ extern int optind, opterr, optopt;
 
 namespace {
 
-    std::unordered_map<struct sockaddr_in, int64_t> clients; // socket - session_id
+    std::unordered_map<unsigned long, Client> clients; // address - session_id
 
     std::shared_ptr<GameState> gstate;
 
@@ -29,6 +28,7 @@ namespace {
     time_t seed;
     int wait_time_us;
     int wait_time_ms;
+    int sock;
 
     int32_t is_positive_int(char *string) {
         char *temp = string;
@@ -73,7 +73,7 @@ namespace {
         wait_time_ms = wait_time_us / 1000;
     }
 
-    void udp_socket(int &sock, uint16_t port) {
+    void udp_socket() {
         struct sockaddr_in my_address;
         my_address.sin_family = AF_INET; // IPv4
         my_address.sin_addr.s_addr = htonl(INADDR_ANY); // listening on all interfaces
@@ -85,20 +85,49 @@ namespace {
 
     }
 
-    void process_new_cdata(const struct sockaddr_in &player_address, cdata_ptr data) {
-        auto client = clients.find(player_address);
+    void process_cdata(const struct sockaddr_in &player_address, cdata_ptr data) {
+        std::cout<<data->player_name()<<" "<<data->next_event()<<" "<<data->session_id()<<"\n"; // TODO
+        auto client = clients.find(player_address.sin_addr.s_addr);
 
         // nowe gniazdo, klient o znanej nazwie
-        if (client == clients.end() && gstate->exist_player(data->player_name()))
+        if (client == clients.end() && gstate->exist_player(data->player_name())) {
+            std::cout<<"Istnieje już gracz o takim nicku\n";
             return;
-
-        // poprawny nowy klient
-        if (client == clients.end() || client->second < data->session_id())
-            clients.insert(std::make_pair(player_address, data->session_id()));
+        }
 
         // zbyt stare session_id
-        else if (client->second > data->session_id())
+        if (client->second.session_id() > data->session_id()) {
+            std::cout<<"Nieaktualny datagram";
             return;
+        }
+
+        // poprawny nowy klient
+        if (client == clients.end() || client->second.session_id() < data->session_id()) {
+            Client c(player_address, data->session_id());
+            clients.insert(std::make_pair(player_address.sin_addr.s_addr, std::move(c)));
+            std::cout<<"Tworzenie nowego gracza\n";
+        }
+
+
+
+        // TODO tutaj przetworzyć komunika od klienta
+
+    }
+
+    void read_from_client() {
+        struct sockaddr_in client_address;
+        socklen_t rcva_len;
+        rcva_len = (socklen_t) sizeof(client_address);
+        ssize_t len;
+        char buffer[CLIENT_TO_SERVER_SIZE];
+        int flags = 0;
+        len = recvfrom(sock, buffer, sizeof(buffer), flags,
+                       (struct sockaddr *) &client_address, &rcva_len);
+        cdata_ptr c = buffer_to_client_data(buffer, len);
+        process_cdata(client_address, c);
+    }
+
+    void write_to_client() {
 
     }
 
@@ -109,7 +138,7 @@ namespace {
         ssize_t len = 1;
         struct pollfd client;
         client.fd = sock;
-        client.events = POLLIN | POLLOUT;
+        client.events = POLLIN;
         int ret, to_wait;
         to_wait = wait_time_ms;
         uint64_t next_send = get_timestamp() + wait_time_us;
@@ -118,11 +147,16 @@ namespace {
             ret = poll(&client, 1, to_wait);
             if (ret < 1) {
                 next_send = get_timestamp() + wait_time_us;
-                //TODO wyslac wszystko co trzeba
+                //gstate->nextTurn();
                 to_wait = wait_time_ms;
             }
             else {
-                //TODO cos dostalismy
+                if (client.revents & POLLIN) {
+                    read_from_client();
+                }
+                else if (client.revents & POLLOUT) {
+                    // TODO pisanie do klienta
+                }
             }
         }
     }
@@ -134,14 +168,13 @@ int main(int argc, char *argv[]) {
 
     parse_arguments(argc, argv);
 
-    gstate = std::make_shared<GameState>(seed);
+    gstate = std::make_shared<GameState>(seed, height, width, turning_speed);
 
     // udp configuration
-    int sock;
     sock = socket(AF_INET, SOCK_DGRAM, 0);
     if (sock < 0)
         syserr("socket");
-    udp_socket(sock, port);
+    udp_socket();
 
     snd_and_recv(sock);
 

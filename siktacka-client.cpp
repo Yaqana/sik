@@ -64,8 +64,8 @@ int ui_write(int sock){
 }
 
 int ui_read(int sock, char* buffer, cdata_ptr data){
-    memset(buffer, 0, UI_RECEIVE_SIZE);
-    ssize_t len = read(sock, buffer, UI_RECEIVE_SIZE - 1);
+    memset(buffer, 0, UI_TO_CLIENT_SIZE);
+    ssize_t len = read(sock, buffer, UI_TO_CLIENT_SIZE - 1);
     if (len < 0) {
         syserr("read");
         return 1;
@@ -83,7 +83,7 @@ int ui_read(int sock, char* buffer, cdata_ptr data){
 
 int server_send(int sock, cdata_ptr data, struct sockaddr_in *server_address){
     int sflags = 0;
-    char c_data[SERVER_SEND_SIZE];
+    char c_data[CLIENT_TO_SERVER_SIZE];
     size_t msg_len = data->toBuffer(c_data);
     socklen_t snda_len = (socklen_t) sizeof(*server_address);
     ssize_t len = sendto(sock, c_data, msg_len, sflags,
@@ -99,8 +99,8 @@ void server_read(int sock, struct sockaddr_in *server_address,  int ui_sock,
                  uint32_t &next_event, int &players_nr) {
     socklen_t rcva_len = (socklen_t) sizeof (server_address);
     int flags = 0;
-    char buffer2[SERVER_RECEIVE_SIZE];
-    ssize_t len = recvfrom(sock, buffer2, SERVER_RECEIVE_SIZE, flags,
+    char buffer2[SERVER_TO_CLIENT_SIZE];
+    ssize_t len = recvfrom(sock, buffer2, SERVER_TO_CLIENT_SIZE, flags,
                            (struct sockaddr *) &server_address, &rcva_len);
     if (len < 0)
         syserr("error on datagram from client socket");
@@ -228,7 +228,7 @@ int main(int argc, char* argv[]) {
 
     const std::string example_buffer = "NEW_GAME 800 600 ala magda\n";
 
-    char buffer_ui_receive[UI_RECEIVE_SIZE];
+    char buffer_ui_receive[UI_TO_CLIENT_SIZE];
 
     ret = 1; //TODO sztuczna petla
 

@@ -1,6 +1,7 @@
 #include <cstdint>
-#include <unordered_set>
 #include <set>
+#include <map>
+#include <netinet/in.h>
 
 #include "siktacka.h"
 #include "data_structures.h"
@@ -10,6 +11,17 @@
 
 #endif //SERVER_H
 
+class Client{
+public:
+    Client(const struct sockaddr_in &addres, int64_t session_id):
+            addres_(addres), session_id_(session_id) {};
+    void sendTo(char* buffer);
+    int64_t session_id() { return session_id_; }
+
+private:
+    struct sockaddr_in addres_;
+    int64_t session_id_;
+};
 
 class PlayerData {
 public:
@@ -27,7 +39,7 @@ public:
 
     void move(uint32_t turningSpeed);
 
-    std::pair<int, int> pixel() const { return std::make_pair((int)head_x, (int)head_y_); }
+    std::pair<int, int> pixel() const { return std::make_pair((int)head_x_, (int)head_y_); }
 
     bool active() const { return active_; }
 
@@ -43,42 +55,6 @@ private:
 
 using player_ptr = std::shared_ptr<PlayerData>;
 
-class GameState {
-public:
-    GameState(time_t rand_seed, uint32_t maxx, uint32_t maxy, uint32_t turningSpeed);
-
-    void new_player(const std::string &p);
-
-    bool exist_player(const std::string &player_name) const;
-
-    std::vector<event_ptr> nextTurn();
-
-
-private:
-    uint32_t gid_;
-    uint32_t maxx_;
-    uint32_t maxy_;
-    std::set<player_ptr, SortPlayers> players_;
-    std::vector<event_ptr> events_;
-    bool active_ = false;
-    uint32_t turningSpeed_;
-
-    //przechowuje informacje o stanie planszy
-    //byc moze unordered_map jesli trzeba bedzie trzymac gracza
-    std::unordered_set<std::pair<uint32_t, uint32_t>> board_;
-
-    Random rand_;
-
-    uint32_t rand() { return rand_.next(); }
-
-    struct SortPlayers;
-
-    event_ptr newPlayer(const std::string &player_name);
-
-    void startGame();
-};
-
-
 class Random {
 public:
     Random(time_t seed) : random_(seed) {}
@@ -92,6 +68,48 @@ private:
     time_t random_;
     const int64_t multipl_ = 279470273;
     const int64_t modulo_ = 4294967291;
+};
+
+
+class GameState {
+public:
+    GameState(time_t rand_seed, uint32_t maxx, uint32_t maxy, uint32_t turningSpeed);
+
+    bool exist_player(const std::string &player_name) const;
+
+    std::vector<event_ptr> nextTurn();
+
+    void processData(cdata_ptr data);
+
+
+private:
+    struct SortPlayers {
+        int operator()(const player_ptr p1, const player_ptr p2) const {
+            return p1->player_name().compare(p2->player_name());
+        }
+    };
+    uint32_t gid_;
+    uint32_t maxx_;
+    uint32_t maxy_;
+    std::map<std::string, player_ptr> players_;
+    std::vector<event_ptr> events_;
+    bool active_ = false;
+    uint32_t turningSpeed_;
+    std::set<std::string> ready_players_;
+
+    //przechowuje informacje o stanie planszy
+    //byc moze unordered_map jesli trzeba bedzie trzymac gracza
+    std::set<std::pair<uint32_t, uint32_t>> board_;
+
+    Random rand_;
+
+    uint32_t rand() { return rand_.next(); }
+
+    player_ptr newPlayer(const std::string &player_name);
+
+
+
+    void startGame();
 };
 
 
