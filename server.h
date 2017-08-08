@@ -1,3 +1,6 @@
+#ifndef SERVER_H
+#define SERVER_H
+
 #include <cstdint>
 #include <set>
 #include <map>
@@ -6,16 +9,21 @@
 #include "siktacka.h"
 #include "data_structures.h"
 
-#ifndef SERVER_H
-#define SERVER_H
-
-#endif //SERVER_H
+namespace {
+    void hexdump(char *buffer, size_t len) {
+        printf("\n");
+        for (size_t i = 0; i < len; i++) {
+            printf("%02X ", *(buffer + i));
+        }
+        printf("\n");
+    }
+}
 
 class Client{
 public:
     Client(const struct sockaddr_in &addres, int64_t session_id):
             addres_(addres), session_id_(session_id) {};
-    void sendTo(char *buffer, size_t len, int sock) const;
+    void sendTo(sdata_ptr server_data, int sock) const;
     int64_t session_id() const { return session_id_; }
 
 private:
@@ -25,12 +33,12 @@ private:
 
 class SendData {
 public:
-    SendData(char* buffer, size_t len, std::shared_ptr<Client> client, int sock):
-            buffer_(buffer), len_(len), client_(client), sock_(sock) {}
-    void send() const { client_->sendTo(buffer_, len_, sock_);};
+    SendData(sdata_ptr server_data, std::shared_ptr<Client> client, int sock):
+            server_data_(server_data), client_(client), sock_(sock) {
+    }
+    void send() const { client_->sendTo(server_data_, sock_);};
 private:
-    char* buffer_;
-    size_t len_;
+    sdata_ptr server_data_;
     std::shared_ptr<Client> client_;
     int sock_;
 };
@@ -72,14 +80,15 @@ public:
     Random(time_t seed) : random_(seed) {}
 
     uint32_t next() {
+        uint32_t res = (uint32_t )random_;
         random_ = (random_ * multipl_) % modulo_;
-        return (uint32_t)random_;
+        return res;
     }
 
 private:
     time_t random_;
-    const int64_t multipl_ = 279470273;
-    const int64_t modulo_ = 4294967291;
+    const uint64_t multipl_ = 279470273;
+    const uint64_t modulo_ = 4294967291;
 };
 
 
@@ -111,7 +120,7 @@ private:
     std::vector<event_ptr> events_;
     bool active_ = false;
     uint32_t turningSpeed_;
-    std::set<std::string> ready_players_;
+    std::vector<std::string> ready_players_;
 
     //przechowuje informacje o stanie planszy
     //byc moze unordered_map jesli trzeba bedzie trzymac gracza
@@ -128,5 +137,5 @@ private:
     void startGame();
 };
 
-
+#endif //SERVER_H
 

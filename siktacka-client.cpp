@@ -10,14 +10,13 @@
 #include <iostream>
 #include <zconf.h>
 #include <queue>
-#include "siktacka.h"
 #include "data_structures.h"
 
 namespace {
     const int UI = 0;
     const int SERVER = 1;
-    const int SEND_INTERVAL_ms = 20; // co ile wysylany jest komunikat
-    const int SEND_INTERVAL_us = 20000;
+    const int SEND_INTERVAL_ms = 2000; // co ile wysylany jest komunikat
+    const int SEND_INTERVAL_us = 2000000;
     const int LEFT = -1;
     const int AHEAD = 0;
     const int RIGHT = 1;
@@ -27,6 +26,13 @@ namespace {
     uint16_t server_port = 12345;
     uint16_t ui_port = 12346;
     std::string ui_server = "localhost";
+    // TODO remove
+    void hexdump(char* buffer, size_t len){
+        for (size_t i = 0; i < len; i++){
+            printf("%02X ", *(buffer+i));
+        }
+    }
+
 }
 
 void parse_port(const std::string &to_parse, std::string &server, uint16_t &port){
@@ -53,7 +59,7 @@ int parse_arguments(int argc, char* argv[]){
 }
 
 int ui_write(int sock){
-    char buffer[UI_SEND_SIZE];
+    char buffer[CLIENT_TO_UI_SIZE];
     event_ptr event = events.front();
     events.pop();
     size_t len = event->toGuiBuffer(buffer);
@@ -105,10 +111,14 @@ void server_read(int sock, struct sockaddr_in *server_address,  int ui_sock,
                            (struct sockaddr *) &server_address, &rcva_len);
     if (len < 0)
         syserr("error on datagram from client socket");
+    hexdump(buffer2, size_t(len));
     sdata_ptr data = buffer_to_server_data(buffer2, (size_t)len);
     for (auto &ev : data->events()) {
         if (ev->event_no() != next_event)
             return; // dostalismy niespojny kawalek zdarzen
+        char buffer[CLIENT_TO_UI_SIZE];
+        size_t llen = ev->toGuiBuffer(buffer);
+        std::cout<<buffer<<"\n";
         events.push(ev);
         next_event++;
     }
@@ -219,7 +229,7 @@ int main(int argc, char* argv[]) {
     client[SERVER].fd = server_sock;
     client[UI].fd = ui_sock;
     client[SERVER].events = POLLIN;
-    client[UI].events = POLLIN;
+    client[UI].events = 0;
     client[SERVER].revents = 0;
     client[UI].revents = 0;
 
@@ -239,24 +249,29 @@ int main(int argc, char* argv[]) {
         ret = poll(client, 2, to_wait);
         if(ret < 1) {
             next_send = get_timestamp() + SEND_INTERVAL_us;
-            server_send(server_sock, data, &server_address);
+            client[SERVER].events = POLLOUT;
+            //server_send(server_sock, data, &server_address);
             ret=1; // TODO taka sztuczna petla
-            to_wait=20;
+            to_wait=SEND_INTERVAL_ms;
         }
         else {
             if (client[UI].revents & POLLIN) {
                 ui_read(ui_sock, buffer_ui_receive, data);
+                client[UI].events = POLLOUT;
             }
             if (client[UI].revents & POLLOUT) {
                 ui_write(ui_sock);
-                //client[UI].events = POLLIN;
+                client[UI].events = POLLIN;
             }
             if (client[SERVER].revents & POLLOUT) {
                 server_send(server_sock, data, &server_address);
+                client[SERVER].events = POLLIN;
             }
             if (client[SERVER].revents & POLLIN){
+                std::cout<<"reading from server\n";
                 server_read(server_sock, &server_address, ui_sock, next_event, active_players);
                 data->set_next_event(next_event);
+                //client[SERVER].events = POLLOUT;
             }
             to_wait = std::max((next_send - get_timestamp())/1000, (int64_t)0);
         }

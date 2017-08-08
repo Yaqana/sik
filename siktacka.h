@@ -7,13 +7,17 @@
 #include <sys/time.h>
 #include "err.h"
 
-#define UI_SEND_SIZE 64
+#define CLIENT_TO_UI_SIZE 64
 #define UI_TO_CLIENT_SIZE 30
 #define CLIENT_TO_SERVER_SIZE 80
 #define SERVER_TO_CLIENT_SIZE 512
 #define EVENT_BUFFER_SIZE 512
 #define MAX_PLAYERS 42
 
+#define htonll(x) ((1==htonl(1)) ? (x) : ((uint64_t)htonl((x) & 0xFFFFFFFF) << 32) | htonl((x) >> 32))
+#define ntohll(x) ((1==ntohl(1)) ? (x) : ((uint64_t)ntohl((x) & 0xFFFFFFFF) << 32) | ntohl((x) >> 32))
+
 int64_t get_timestamp();
 uint16_t validate_port(const std::string &port);
+
 #endif SIKTACKA_H

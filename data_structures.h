@@ -1,26 +1,8 @@
 #ifndef DATA_STRUCTURES_H
 #define DATA_STRUCTURES_H
 
-#include <cstdint>
-#include <string>
-#include <vector>
-#include <memory>
-#include <iostream>
-
 #include "siktacka.h"
-
-#define htonll(x) ((1==htonl(1)) ? (x) : ((uint64_t)htonl((x) & 0xFFFFFFFF) << 32) | htonl((x) >> 32))
-#define ntohll(x) ((1==ntohl(1)) ? (x) : ((uint64_t)ntohl((x) & 0xFFFFFFFF) << 32) | ntohl((x) >> 32))
-
-/*
-typedef struct client_data {
-public:
-    uint64_t session_id;
-    int8_t turn_direction;
-    uint32_t next_expected_event_no;
-    std::string player_name;
-} cdata;
- */
+#include "events.h"
 
 class ClientData {
 public:
@@ -41,81 +23,6 @@ private:
 };
 
 typedef std::shared_ptr<ClientData> cdata_ptr;
-
-/*
-typedef struct _event {
-    uint32_t len;
-    uint32_t event_no;
-    uint8_t event_type;
-    std::string player_name;
-
-    //event data:
-    uint32_t maxx;
-    uint32_t maxy;
-    std::vector<std::string> players;
-
-    uint8_t player_number;
-    uint32_t x;
-    uint32_t y;
-
-    uint32_t crc32;
-
-} event; */
-
-class Event {
-public:
-    virtual size_t toGuiBuffer(char* buffer) = 0;
-    size_t toServerBuffer(char* buffer);
-    uint32_t event_no() { return event_no_; }
-protected:
-    uint32_t len_; // czy potrzebne?
-    uint32_t event_no_;
-    uint8_t event_type_;
-    uint32_t crc32_;
-private:
-    virtual size_t dataToBuffer(char* buffer) = 0;
-};
-
-class NewGame: public Event {
-public:
-    NewGame(char* buffer, size_t len, uint32_t event_no);
-    NewGame(uint32_t maxx, uint32_t maxy, const std::vector<std::string> &players, uint32_t event_no);
-    size_t toGuiBuffer(char* buffer) override;
-private:
-    uint32_t maxx_;
-    uint32_t maxy_;
-    std::vector<std::string> players_;
-    size_t dataToBuffer(char* buffer) override;
-};
-
-class Pixel: public Event {
-public:
-    Pixel(char* buffer, size_t len, uint32_t event_no);
-    size_t toGuiBuffer(char* buffer) override;
-private:
-    uint32_t x_;
-    uint32_t y_;
-    uint8_t playerNumber_;
-    size_t dataToBuffer(char* buffer) override;
-};
-
-class PlayerEliminated: public Event {
-public:
-    PlayerEliminated(char* buffer, size_t len, uint32_t event_no);
-    size_t toGuiBuffer(char* buffer) override;
-private:
-    uint8_t playerNumber_;
-    size_t dataToBuffer(char* buffer) override;
-};
-
-class GameOver: public Event {
-public:
-    GameOver();
-    size_t toGuiBuffer(char* buffer);
-    size_t dataToBuffer(char* buffer) override;
-};
-
-using event_ptr = std::shared_ptr<Event>;
 
 class ServerData {
 public:

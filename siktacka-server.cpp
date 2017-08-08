@@ -15,14 +15,13 @@
 extern char *optarg;
 extern int optind, opterr, optopt;
 
-
 namespace {
 
     std::unordered_map<unsigned long, std::shared_ptr<Client>> clients; // address - session_id
 
     std::shared_ptr<GameState> gstate;
 
-    std::queue<SendData> toSend;
+    std::queue<std::shared_ptr<SendData>> toSend;
 
     uint32_t width = 800;
     uint32_t height = 600;
@@ -99,12 +98,6 @@ namespace {
             return;
         }
 
-        // zbyt stare session_id
-        if (itr->second->session_id() > data->session_id()) {
-            std::cout<<"Nieaktualny datagram";
-            return;
-        }
-
         std::shared_ptr<Client> c;
         // poprawny nowy klient
         if (itr == clients.end() || itr->second->session_id() < data->session_id()) {
@@ -116,13 +109,20 @@ namespace {
             c = itr->second;
         }
 
+        // zbyt stare session_id
+        if (c->session_id() > data->session_id()) {
+            std::cout<<"Nieaktualny datagram";
+            return;
+        }
+
         gstate->processData(data);
 
         sdata_ptr events_to_send = gstate->eventsToSend(data->next_event());
-        char buffer[SERVER_TO_CLIENT_SIZE];
-        size_t len = events_to_send->toBuffer(buffer);
-        SendData s(buffer, len, c, sock);
-        toSend.push(std::move(s));
+        if(events_to_send) {
+            std::cout<<"Jest event do wyslania\n";
+            std::shared_ptr<SendData> s = std::make_shared<SendData>(events_to_send, c, sock);
+            toSend.push(s);
+        }
 
     }
 
@@ -140,16 +140,13 @@ namespace {
     }
 
     void write_to_client() {
-        const SendData &sendData = toSend.front();
+        std::cout<<"write_to_client()\n";
+        std::shared_ptr<SendData> s = toSend.front();
         toSend.pop();
-        sendData.send();
+        s->send();
     }
 
     void snd_and_recv(int sock) {
-        struct sockaddr_in player_address;
-        socklen_t snda_len, rcva_len;
-        int flags, sflags;
-        ssize_t len = 1;
         struct pollfd client;
         client.fd = sock;
         client.events = POLLIN;
@@ -168,9 +165,14 @@ namespace {
             else {
                 if (client.revents & POLLIN) {
                     read_from_client();
+                    std::cout<<toSend.size();
+                    if (!toSend.empty()) {
+                        client.events = POLLOUT;
+                    }
                 }
                 else if (client.revents & POLLOUT) {
                     write_to_client();
+                    client.events = POLLIN;
                 }
                 to_wait = std::max((next_send - get_timestamp())/1000, (int64_t )0);
             }

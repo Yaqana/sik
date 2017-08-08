@@ -1,4 +1,6 @@
+#include <algorithm>
 #include <cmath>
+#include <iostream>
 
 #include "server.h"
 
@@ -13,6 +15,7 @@ void PlayerData::move(uint32_t turningSpeed) {
 GameState::GameState(time_t rand_seed, uint32_t maxx, uint32_t maxy, uint32_t turningSpeed):
     rand_(Random(rand_seed)), maxx_(maxx), maxy_(maxy), turningSpeed_(turningSpeed) {
     gid_ = rand();
+    std::cout<<"constructor: gid_: "<<gid_<<" maxx, maxy: "<<maxx_<<" "<<maxy<<"\n";
 }
 
 
@@ -33,7 +36,7 @@ player_ptr GameState::newPlayer(const std::string &player_name) {
 }
 
 void GameState::startGame() {
-    active_ = true;
+    //active_ = true;
     std::vector<std::string> players(ready_players_.begin(), ready_players_.end());
     event_ptr event(new NewGame(maxx_, maxy_, std::move(players), events_.size()));
     events_.push_back(event);
@@ -48,12 +51,15 @@ void GameState::processData(cdata_ptr data) {
     else {
         player = it->second;
     }
-    if (data->turn_direction() != 0) {
-        auto ready = ready_players_.find(data->player_name());
+    if (data->turn_direction() == 0) {
+        auto ready = find(ready_players_.begin(), ready_players_.end(), data->player_name());
         if (ready == ready_players_.end()) {
-            ready_players_.insert(data->player_name());
-            if (ready_players_.size() == 2)
+            std::cout<<"Player not found\n";
+            ready_players_.push_back(data->player_name());
+            if (ready_players_.size() == 1) {
+                std::cout<<"Start new game\n";
                 startGame();
+            }
         }
     }
     player->set_dir(data->turn_direction());
@@ -77,12 +83,17 @@ std::vector<event_ptr> GameState::nextTurn() {
 };
 
 sdata_ptr GameState::eventsToSend(uint32_t firstEvent) {
+    if (firstEvent == events_.size())
+        return sdata_ptr();
     std::vector<event_ptr> events(events_.begin()+firstEvent, events_.end());
     sdata_ptr serverData(new ServerData(gid_, std::move(events)));
     return serverData;
 }
 
-void Client::sendTo(char *buffer, size_t len, int sock) const {
+void Client::sendTo(sdata_ptr server_data, int sock) const {
+    std::cout<<"Client::sendTo\n";
+    char buffer[SERVER_TO_CLIENT_SIZE];
+    size_t len = server_data->toBuffer(buffer);
     socklen_t snda_len = (socklen_t)sizeof(addres_);
     int flags = 0;
     ssize_t snd_len = sendto(sock, buffer, len, flags,
