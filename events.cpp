@@ -25,7 +25,7 @@ NewGame::NewGame(char *buffer, size_t len, uint32_t event_no) {
     size_t count = 0;
     maxx_ = ntohl(x);
     maxy_ = ntohl(y);
-    while (ptr < len) {
+    while (ptr < len - 4) { // CRC
         while (*(buffer + ptr + count) >= 33 && *(buffer + ptr + count) <= 126) {
             count += 1;
         }
@@ -43,6 +43,7 @@ Pixel::Pixel(char *buffer, size_t len, uint32_t event_no) {
     size_t ptr = 0;
     uint32_t x, y;
     memcpy(&playerNumber_, buffer, 1);
+    std::cout<<"Pixel::Pixel pn: "<<(int)playerNumber_<<"\n";
     ptr += 1;
     memcpy(&x, buffer + ptr, 4);
     x_ = ntohl(x);
@@ -56,13 +57,12 @@ PlayerEliminated::PlayerEliminated(char *buffer, size_t len, uint32_t event_no) 
     memcpy(&playerNumber_, buffer, 1);
 }
 
-GameOver::GameOver() {};
-
-size_t NewGame::toGuiBuffer(char* buffer) {
+size_t NewGame::toGuiBuffer(char *buffer) {
     size_t ptr = 0;
     sprintf(buffer, "NEW_GAME %u %u ", maxx_, maxy_);
+    ptr += strlen(buffer);
     for (auto &p : players_) {
-        ptr += sprintf(buffer + ptr, "%s\0", p.c_str());
+        ptr += sprintf(buffer + ptr, "%s ", p.c_str());
     }
     ptr = strlen(buffer);
     sprintf(buffer + ptr, "\n");
@@ -70,12 +70,12 @@ size_t NewGame::toGuiBuffer(char* buffer) {
 };
 
 size_t Pixel::toGuiBuffer(char *buffer) {
-    sprintf(buffer, "PIXEL %u %u %u\n", x_, y_, playerNumber_);
+    sprintf(buffer, "PIXEL %u %u %s\n", x_, y_, player_name_.c_str());
     return strlen(buffer);
 }
 
 size_t PlayerEliminated::toGuiBuffer(char *buffer) {
-    sprintf(buffer, "PLAYER_ELIMINATED %u\n", playerNumber_);
+    sprintf(buffer, "PLAYER_ELIMINATED %s\n", player_name_.c_str());
     return strlen(buffer);
 }
 
@@ -92,10 +92,7 @@ size_t Event::toServerBuffer(char *buffer) {
     uint32_t len = 5;
     len += dataToBuffer(buffer+9);
     uint32_t len_hton = htonl(len);
-    std::cout<<"dlugosc komunikatu "<<len<<"\n";
     memcpy(buffer, &len_hton, 4);
-    std::cout<<"len_hton: "<<len_hton;
-    hexdump(buffer, len+8);
     return len + 8; //TODO crc
 }
 
@@ -133,4 +130,15 @@ size_t PlayerEliminated::dataToBuffer(char *buffer) {
 
 size_t GameOver::dataToBuffer(char *buffer) {
     return 0;
+}
+
+void PlayerEliminated::mapName(const std::vector<std::string> &players){
+    if (playerNumber_ < players.size())
+        player_name_ = players[playerNumber_];
+}
+
+void Pixel::mapName(const std::vector<std::string> &players){
+    std::cout<<"Pixel::mapName"<<(int)playerNumber_<<" "<<players.size();
+    if (playerNumber_ < players.size())
+        player_name_ = players[playerNumber_];
 }

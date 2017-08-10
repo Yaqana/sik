@@ -17,7 +17,7 @@ extern int optind, opterr, optopt;
 
 namespace {
 
-    std::unordered_map<unsigned long, std::shared_ptr<Client>> clients; // address - session_id
+    std::vector<std::shared_ptr<Client>> clients;
 
     std::shared_ptr<GameState> gstate;
 
@@ -26,7 +26,7 @@ namespace {
     uint32_t width = 800;
     uint32_t height = 600;
     uint16_t port = 12345;
-    uint32_t speed = 50;
+    uint32_t speed = 1;
     uint32_t turning_speed = 6;
     time_t seed;
     int wait_time_us;
@@ -89,37 +89,32 @@ namespace {
     }
 
     void process_cdata(const struct sockaddr_in &player_address, cdata_ptr data) {
-        std::cout<<data->player_name()<<" "<<data->next_event()<<" "<<data->session_id()<<"\n"; // TODO
-        auto itr = clients.find(player_address.sin_addr.s_addr);
-
-        // nowe gniazdo, klient o znanej nazwie
-        if (itr == clients.end() && gstate->exist_player(data->player_name())) {
-            std::cout<<"Istnieje już gracz o takim nicku\n";
-            return;
-        }
+        std::cout<<data->player_name()<<" "<<data->next_event()<<" "<<data->session_id()<<" "<<(int)(data->turn_direction())<<"\n"; // TODO
+        bool new_client = true;
 
         std::shared_ptr<Client> c;
-        // poprawny nowy klient
-        if (itr == clients.end() || itr->second->session_id() < data->session_id()) {
-            c = std::make_shared<Client>(player_address, data->session_id());
-            clients.insert(std::make_pair(player_address.sin_addr.s_addr, c));
-            std::cout<<"Tworzenie nowego gracza\n";
-        }
-        else {
-            c = itr->second;
+
+        // check if the client is new
+        for (auto client: clients) {
+            if (client->addr() == player_address.sin_addr.s_addr && client->port() == player_address.sin_port) {
+                if (client->session_id() > data->session_id()) // Old datagram
+                    return;
+                new_client = false;
+                c = client;
+                break;
+            }
         }
 
-        // zbyt stare session_id
-        if (c->session_id() > data->session_id()) {
-            std::cout<<"Nieaktualny datagram";
-            return;
+        // valid new client
+        if (new_client) {
+            c = std::make_shared<Client>(player_address, data->session_id());
+            clients.push_back(c);
         }
 
         gstate->processData(data);
 
         sdata_ptr events_to_send = gstate->eventsToSend(data->next_event());
         if(events_to_send) {
-            std::cout<<"Jest event do wyslania\n";
             std::shared_ptr<SendData> s = std::make_shared<SendData>(events_to_send, c, sock);
             toSend.push(s);
         }
@@ -140,7 +135,6 @@ namespace {
     }
 
     void write_to_client() {
-        std::cout<<"write_to_client()\n";
         std::shared_ptr<SendData> s = toSend.front();
         toSend.pop();
         s->send();
@@ -153,7 +147,7 @@ namespace {
         int ret, to_wait;
         to_wait = wait_time_ms;
         int64_t next_send = get_timestamp() + wait_time_us;
-        while(true) { //TODO
+        while(true) { // TODO
             client.revents = 0;
             ret = poll(&client, 1, to_wait);
             if (ret < 1) {
@@ -165,7 +159,6 @@ namespace {
             else {
                 if (client.revents & POLLIN) {
                     read_from_client();
-                    std::cout<<toSend.size();
                     if (!toSend.empty()) {
                         client.events = POLLOUT;
                     }
@@ -185,6 +178,8 @@ int main(int argc, char *argv[]) {
     seed = time(NULL);
 
     parse_arguments(argc, argv);
+
+    std::cout<<"parsed\n";
 
     gstate = std::make_shared<GameState>(seed, height, width, turning_speed);
 

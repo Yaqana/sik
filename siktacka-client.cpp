@@ -15,8 +15,8 @@
 namespace {
     const int UI = 0;
     const int SERVER = 1;
-    const int SEND_INTERVAL_ms = 2000; // co ile wysylany jest komunikat
-    const int SEND_INTERVAL_us = 2000000;
+    const int SEND_INTERVAL_ms = 500; // co ile wysylany jest komunikat
+    const int SEND_INTERVAL_us = 500000;
     const int LEFT = -1;
     const int AHEAD = 0;
     const int RIGHT = 1;
@@ -32,6 +32,7 @@ namespace {
             printf("%02X ", *(buffer+i));
         }
     }
+    cdata_ptr cdata;
 
 }
 
@@ -59,6 +60,9 @@ int parse_arguments(int argc, char* argv[]){
 }
 
 int ui_write(int sock){
+    if (events.empty()) {
+        return 0;
+    }
     char buffer[CLIENT_TO_UI_SIZE];
     event_ptr event = events.front();
     events.pop();
@@ -70,28 +74,29 @@ int ui_write(int sock){
     return 0;
 }
 
-int ui_read(int sock, char* buffer, cdata_ptr data){
+int ui_read(int sock, char* buffer){
     memset(buffer, 0, UI_TO_CLIENT_SIZE);
     ssize_t len = read(sock, buffer, UI_TO_CLIENT_SIZE - 1);
+    std::cout<<buffer;
     if (len < 0) {
         syserr("read");
         return 1;
     }
     if(strcmp(buffer, "LEFT_KEY_DOWN\n") == 0) {
-        data->set_turn_direction(LEFT);
+        cdata->set_turn_direction(LEFT);
     }
     else if (strcmp(buffer, "RIGHT_KEY_DOWN\n")== 0) {
-        data->set_turn_direction(RIGHT);
+        cdata->set_turn_direction(RIGHT);
     }
     else
-        data->set_turn_direction(AHEAD);
+        cdata->set_turn_direction(AHEAD);
     return 0;
 }
 
-int server_send(int sock, cdata_ptr data, struct sockaddr_in *server_address){
+int server_send(int sock, struct sockaddr_in *server_address){
     int sflags = 0;
     char c_data[CLIENT_TO_SERVER_SIZE];
-    size_t msg_len = data->toBuffer(c_data);
+    size_t msg_len = cdata->toBuffer(c_data);
     socklen_t snda_len = (socklen_t) sizeof(*server_address);
     ssize_t len = sendto(sock, c_data, msg_len, sflags,
                          (struct sockaddr *) server_address, snda_len);
@@ -102,8 +107,7 @@ int server_send(int sock, cdata_ptr data, struct sockaddr_in *server_address){
     return 0;
 }
 
-void server_read(int sock, struct sockaddr_in *server_address,  int ui_sock,
-                 uint32_t &next_event, int &players_nr) {
+void server_read(int sock, struct sockaddr_in *server_address) {
     socklen_t rcva_len = (socklen_t) sizeof (server_address);
     int flags = 0;
     char buffer2[SERVER_TO_CLIENT_SIZE];
@@ -111,16 +115,21 @@ void server_read(int sock, struct sockaddr_in *server_address,  int ui_sock,
                            (struct sockaddr *) &server_address, &rcva_len);
     if (len < 0)
         syserr("error on datagram from client socket");
-    hexdump(buffer2, size_t(len));
     sdata_ptr data = buffer_to_server_data(buffer2, (size_t)len);
     for (auto &ev : data->events()) {
-        if (ev->event_no() != next_event)
-            return; // dostalismy niespojny kawalek zdarzen
-        char buffer[CLIENT_TO_UI_SIZE];
-        size_t llen = ev->toGuiBuffer(buffer);
-        std::cout<<buffer<<"\n";
+        if (ev->event_no() != cdata->next_event()) {
+            std::cout<<"niespojne zdarzenia"<<ev->event_no()<<"\n";
+            //return; // dostalismy niespojny kawalek zdarzen
+        }
+        if (players.size() == 0) {
+            players = ev->players();
+            for (auto &p: players) {
+                std::cout<<"gracz: "<<p<<"\n";
+            }
+        }
+        ev->mapName(players);
         events.push(ev);
-        next_event++;
+        cdata->inc_next_event();
     }
 }
 
@@ -209,8 +218,8 @@ int main(int argc, char* argv[]) {
     std::cout<<player_name<<" "<<server<<" "<<server_port<<" "<<ui_server<<" "<<ui_port<<"\n";
 
     uint64_t session_id = get_timestamp();
-    uint32_t next_event = 0;
     int8_t turn = 0;
+    uint32_t next_event = 0;
 
     // UDP configuration
     struct sockaddr_in server_address;
@@ -221,7 +230,7 @@ int main(int argc, char* argv[]) {
     int ui_sock = tcp_socket(ui_server, ui_port);
 
     //client data configuration
-    cdata_ptr data = std::make_shared<ClientData>
+     cdata = std::make_shared<ClientData>
             (session_id, turn, next_event, player_name);
 
     //poll configuration
@@ -229,15 +238,13 @@ int main(int argc, char* argv[]) {
     client[SERVER].fd = server_sock;
     client[UI].fd = ui_sock;
     client[SERVER].events = POLLIN;
-    client[UI].events = 0;
+    client[UI].events = POLLIN;
     client[SERVER].revents = 0;
     client[UI].revents = 0;
 
     int active_players = 0;
     int64_t next_send = get_timestamp() + SEND_INTERVAL_us;
     int to_wait = SEND_INTERVAL_ms;
-
-    const std::string example_buffer = "NEW_GAME 800 600 ala magda\n";
 
     char buffer_ui_receive[UI_TO_CLIENT_SIZE];
 
@@ -256,21 +263,30 @@ int main(int argc, char* argv[]) {
         }
         else {
             if (client[UI].revents & POLLIN) {
-                ui_read(ui_sock, buffer_ui_receive, data);
-                client[UI].events = POLLOUT;
+                std::cout<<"czytanie z ui\n";
+                ui_read(ui_sock, buffer_ui_receive);
+                client[SERVER].events |= POLLOUT;
+                if (events.empty())
+                    client[UI].events = POLLIN;
+                else
+                    client[UI].events = POLLOUT;
             }
             if (client[UI].revents & POLLOUT) {
+                std::cout<<"wysylanie do ui\n";
                 ui_write(ui_sock);
-                client[UI].events = POLLIN;
+                if (events.empty())
+                    client[UI].events = POLLIN;
             }
             if (client[SERVER].revents & POLLOUT) {
-                server_send(server_sock, data, &server_address);
+                server_send(server_sock, &server_address);
                 client[SERVER].events = POLLIN;
+                std::cout<<"wysyalnie do serwera\n";
+                std::cout<<get_timestamp()<<"\n";
             }
             if (client[SERVER].revents & POLLIN){
                 std::cout<<"reading from server\n";
-                server_read(server_sock, &server_address, ui_sock, next_event, active_players);
-                data->set_next_event(next_event);
+                server_read(server_sock, &server_address);
+                client[UI].events |= POLLOUT;
                 //client[SERVER].events = POLLOUT;
             }
             to_wait = std::max((next_send - get_timestamp())/1000, (int64_t)0);

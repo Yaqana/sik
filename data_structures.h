@@ -8,18 +8,18 @@ class ClientData {
 public:
     ClientData(uint64_t session_id, int8_t turn_direction,
         uint32_t next_event, const std::string &player_name);
-    uint64_t session_id() const { return _session_id; }
-    int8_t turn_direction() const { return _turn_direction; }
-    uint32_t next_event() const { return _next_event; }
-    std::string player_name() const { return _player_name; }
+    uint64_t session_id() const { return session_id_; }
+    int16_t turn_direction() const { return turn_direction_; }
+    uint32_t next_event() const { return next_event_; }
+    std::string player_name() const { return player_name_; }
     size_t toBuffer(char* buffer);
-    void set_turn_direction(int8_t turn_direction) { _turn_direction = turn_direction; }
-    void set_next_event(uint32_t next_event)  { _next_event = next_event; }
+    void set_turn_direction(int8_t turn_direction) { turn_direction_ = turn_direction; }
+    void inc_next_event()  { next_event_++; }
 private:
-    uint64_t _session_id;
-    int8_t _turn_direction;
-    uint32_t _next_event;
-    std::string _player_name;
+    uint64_t session_id_;
+    int8_t turn_direction_;
+    uint32_t next_event_;
+    std::string player_name_;
 };
 
 typedef std::shared_ptr<ClientData> cdata_ptr;

@@ -25,6 +25,8 @@ public:
             addres_(addres), session_id_(session_id) {};
     void sendTo(sdata_ptr server_data, int sock) const;
     int64_t session_id() const { return session_id_; }
+    uint32_t addr() const { return addres_.sin_addr.s_addr; }
+    uint16_t port() const { return addres_.sin_port; }
 
 private:
     struct sockaddr_in addres_;
@@ -46,10 +48,10 @@ private:
 class PlayerData {
 public:
 
-    PlayerData(const std::string &player_name, const double &head_x, const double &head_y, uint32_t dir) :
-            _player_name(player_name), head_x_(head_x), head_y_(head_y), move_dir_(dir) {};
+    PlayerData(const std::string &player_name, uint8_t number, const double &head_x, const double &head_y, uint32_t dir) :
+            player_name_(player_name), number_(number), head_x_(head_x), head_y_(head_y), move_dir_(dir) {};
 
-    std::string player_name() const { return _player_name; }
+    std::string player_name() const { return player_name_; }
 
     double head_x() const { return head_x_; }
 
@@ -63,14 +65,17 @@ public:
 
     bool active() const { return active_; }
 
+    uint8_t number() const { return number_; }
+
 
 private:
-    std::string _player_name;
+    std::string player_name_;
     double head_x_;
     double head_y_;
     int8_t turn_dir_;
     uint32_t move_dir_;
     bool active_;
+    uint8_t number_;
 };
 
 using player_ptr = std::shared_ptr<PlayerData>;
@@ -98,7 +103,7 @@ public:
 
     bool exist_player(const std::string &player_name) const;
 
-    std::vector<event_ptr> nextTurn();
+    void nextTurn();
 
     void processData(cdata_ptr data);
 
@@ -131,8 +136,6 @@ private:
     uint32_t rand() { return rand_.next(); }
 
     player_ptr newPlayer(const std::string &player_name);
-
-
 
     void startGame();
 };
