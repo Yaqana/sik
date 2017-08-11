@@ -26,7 +26,7 @@ namespace {
     uint32_t width = 800;
     uint32_t height = 600;
     uint16_t port = 12345;
-    uint32_t speed = 1;
+    uint32_t speed = 50;
     uint32_t turning_speed = 6;
     time_t seed;
     int wait_time_us;
@@ -89,7 +89,7 @@ namespace {
     }
 
     void process_cdata(const struct sockaddr_in &player_address, cdata_ptr data) {
-        std::cout<<data->player_name()<<" "<<data->next_event()<<" "<<data->session_id()<<" "<<(int)(data->turn_direction())<<"\n"; // TODO
+        //std::cout<<data->player_name()<<" "<<data->next_event()<<" "<<data->session_id()<<" "<<(int)(data->turn_direction())<<"\n"; // TODO
         bool new_client = true;
 
         std::shared_ptr<Client> c;
@@ -113,12 +113,11 @@ namespace {
 
         gstate->processData(data);
 
-        sdata_ptr events_to_send = gstate->eventsToSend(data->next_event());
-        if(events_to_send) {
-            std::shared_ptr<SendData> s = std::make_shared<SendData>(events_to_send, c, sock);
-            toSend.push(s);
+        std::vector<sdata_ptr> sdata_to_send = gstate->eventsToSend(data->next_event());
+        for (auto sdata : sdata_to_send) {
+            toSend.push(std::make_shared<SendData>(sdata, c, sock));
+            //std::cout<<sdata->events().size()<<"\n";
         }
-
     }
 
     void read_from_client() {

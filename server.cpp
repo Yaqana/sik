@@ -6,7 +6,7 @@
 #define NDEGREES 360
 
 void PlayerData::move(uint32_t turningSpeed) {
-    move_dir_ = (move_dir_ + turningSpeed) % NDEGREES;
+    move_dir_ = (move_dir_ + turningSpeed * turn_dir_) % NDEGREES;
     head_x_ += cos(move_dir_);
     head_y_ += sin(move_dir_);
 }
@@ -68,6 +68,7 @@ void GameState::processData(cdata_ptr data) {
 }
 
 void GameState::nextTurn() {
+    std::cout<<"Next Turn "<<get_timestamp()<<"\n";
     for (auto &player : players_) {
         std::pair<int32_t, int32_t> oldCoord = player.second->pixel();
         player.second->move(turningSpeed_);
@@ -84,12 +85,21 @@ void GameState::nextTurn() {
     }
 };
 
-sdata_ptr GameState::eventsToSend(uint32_t firstEvent) {
-    if (firstEvent == events_.size())
-        return sdata_ptr();
-    std::vector<event_ptr> events(events_.begin() + firstEvent, events_.end());
-    sdata_ptr serverData(new ServerData(gid_, std::move(events)));
-    return serverData;
+std::vector<sdata_ptr> GameState::eventsToSend(uint32_t firstEvent) {
+    std::vector<sdata_ptr> res;
+    uint32_t len = 4;
+    std::vector<event_ptr > evs;
+    for (uint32_t it=firstEvent; it < events_.size(); it++) {
+        if (len += events_[it]->len() > SERVER_TO_CLIENT_SIZE) {
+            res.push_back(sdata_ptr(new ServerData(gid_, std::move(evs))));
+            len = 4;
+            evs = {};
+        }
+        evs.push_back(events_[it]);
+    }
+    if (evs.size() > 0)
+        res.push_back(sdata_ptr(new ServerData(gid_, std::move(evs))));
+    return std::move(res);
 }
 
 void Client::sendTo(sdata_ptr server_data, int sock) const {

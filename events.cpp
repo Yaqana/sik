@@ -12,7 +12,12 @@ namespace {
     }
 }
 NewGame::NewGame(uint32_t maxx, uint32_t maxy, const std::vector<std::string> &players, uint32_t event_no)
-        : maxx_(maxx), maxy_(maxy), players_(players) { event_no_ = event_no; };
+        : maxx_(maxx), maxy_(maxy), players_(players) {
+    event_no_ = event_no;
+    len_ += 8;
+    for (auto &p: players)
+        len_ += p.size() + 1;
+};
 
 NewGame::NewGame(char *buffer, size_t len, uint32_t event_no) {
     event_no_ = event_no;
@@ -36,6 +41,7 @@ NewGame::NewGame(char *buffer, size_t len, uint32_t event_no) {
         count = 0;
         players_.push_back(player);
     }
+    len_ = len;
 }
 
 Pixel::Pixel(char *buffer, size_t len, uint32_t event_no) {
@@ -43,18 +49,31 @@ Pixel::Pixel(char *buffer, size_t len, uint32_t event_no) {
     size_t ptr = 0;
     uint32_t x, y;
     memcpy(&playerNumber_, buffer, 1);
-    std::cout<<"Pixel::Pixel pn: "<<(int)playerNumber_<<"\n";
     ptr += 1;
     memcpy(&x, buffer + ptr, 4);
     x_ = ntohl(x);
     ptr += 4;
     memcpy(&y, buffer + ptr, 4);
     y_ = ntohl(y);
+    len_ = len;
+}
+
+Pixel::Pixel(uint32_t x, uint32_t y, uint8_t number, uint32_t event_no)
+    : x_(x), y_(y), playerNumber_(number) {
+    event_no_ = event_no;
+    len_ += 9;
 }
 
 PlayerEliminated::PlayerEliminated(char *buffer, size_t len, uint32_t event_no) {
     event_no_ = event_no;
     memcpy(&playerNumber_, buffer, 1);
+    len_ = len;
+}
+
+PlayerEliminated::PlayerEliminated(uint8_t player_numer, uint32_t event_no)
+    : playerNumber_(player_numer){
+    event_no_ = event_no;
+    len_ += 1;
 }
 
 size_t NewGame::toGuiBuffer(char *buffer) {
@@ -138,7 +157,6 @@ void PlayerEliminated::mapName(const std::vector<std::string> &players){
 }
 
 void Pixel::mapName(const std::vector<std::string> &players){
-    std::cout<<"Pixel::mapName"<<(int)playerNumber_<<" "<<players.size();
     if (playerNumber_ < players.size())
         player_name_ = players[playerNumber_];
 }

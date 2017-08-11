@@ -15,8 +15,8 @@
 namespace {
     const int UI = 0;
     const int SERVER = 1;
-    const int SEND_INTERVAL_ms = 500; // co ile wysylany jest komunikat
-    const int SEND_INTERVAL_us = 500000;
+    const int SEND_INTERVAL_ms = 20; // co ile wysylany jest komunikat
+    const int SEND_INTERVAL_us = 20000;
     const int LEFT = -1;
     const int AHEAD = 0;
     const int RIGHT = 1;
@@ -117,19 +117,18 @@ void server_read(int sock, struct sockaddr_in *server_address) {
         syserr("error on datagram from client socket");
     sdata_ptr data = buffer_to_server_data(buffer2, (size_t)len);
     for (auto &ev : data->events()) {
-        if (ev->event_no() != cdata->next_event()) {
-            std::cout<<"niespojne zdarzenia"<<ev->event_no()<<"\n";
-            //return; // dostalismy niespojny kawalek zdarzen
+        if (ev->event_no() > cdata->next_event()) {
+            std::cout << "niespojne zdarzenia" << ev->event_no() << " " << cdata->next_event() << "\n";
+            return; // dostalismy niespojny kawalek zdarzen
         }
-        if (players.size() == 0) {
-            players = ev->players();
-            for (auto &p: players) {
-                std::cout<<"gracz: "<<p<<"\n";
+        if (ev -> event_no() == cdata->next_event()) {
+            cdata->inc_next_event();
+            if (players.size() == 0) {
+                players = ev->players();
             }
+            ev->mapName(players);
+            events.push(ev);
         }
-        ev->mapName(players);
-        events.push(ev);
-        cdata->inc_next_event();
     }
 }
 
@@ -263,7 +262,6 @@ int main(int argc, char* argv[]) {
         }
         else {
             if (client[UI].revents & POLLIN) {
-                std::cout<<"czytanie z ui\n";
                 ui_read(ui_sock, buffer_ui_receive);
                 client[SERVER].events |= POLLOUT;
                 if (events.empty())
@@ -272,7 +270,6 @@ int main(int argc, char* argv[]) {
                     client[UI].events = POLLOUT;
             }
             if (client[UI].revents & POLLOUT) {
-                std::cout<<"wysylanie do ui\n";
                 ui_write(ui_sock);
                 if (events.empty())
                     client[UI].events = POLLIN;
@@ -280,11 +277,9 @@ int main(int argc, char* argv[]) {
             if (client[SERVER].revents & POLLOUT) {
                 server_send(server_sock, &server_address);
                 client[SERVER].events = POLLIN;
-                std::cout<<"wysyalnie do serwera\n";
-                std::cout<<get_timestamp()<<"\n";
+                //std::cout<<get_timestamp()<<"\n";
             }
             if (client[SERVER].revents & POLLIN){
-                std::cout<<"reading from server\n";
                 server_read(server_sock, &server_address);
                 client[UI].events |= POLLOUT;
                 //client[SERVER].events = POLLOUT;

@@ -13,8 +13,9 @@ class Event {
         uint32_t event_no() { return event_no_; }
         virtual std::vector<std::string> players() const { return std::vector<std::string>(); }
         virtual void mapName (const std::vector<std::string> &players) {}
+        uint32_t len() const { return len_; }
 protected:
-        uint32_t len_; // czy potrzebne?
+        uint32_t len_ = 13; // czy potrzebne?
         uint32_t event_no_;
         uint32_t crc32_;
         virtual uint8_t eventType() = 0;
@@ -40,8 +41,7 @@ private:
 class Pixel: public Event {
 public:
     Pixel(char* buffer, size_t len, uint32_t event_no);
-    Pixel(uint32_t x, uint32_t y, uint8_t number, uint32_t event_no)
-            : x_(x), y_(y), playerNumber_(number) { event_no_= event_no;}
+    Pixel(uint32_t x, uint32_t y, uint8_t number, uint32_t event_no);
     size_t toGuiBuffer(char *buffer) override;
     void mapName(const std::vector<std::string> &players) override ;
 protected:
@@ -57,8 +57,7 @@ private:
 class PlayerEliminated: public Event {
 public:
     PlayerEliminated(char* buffer, size_t len, uint32_t event_no);
-    PlayerEliminated(uint8_t player_numer, uint32_t event_no)
-            :playerNumber_(player_numer) {event_no_ = event_no;}
+    PlayerEliminated(uint8_t player_numer, uint32_t event_no);
     size_t toGuiBuffer(char *buffer) override;
     void mapName(const std::vector<std::string> &players) override ;
 protected:

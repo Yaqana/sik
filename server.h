@@ -107,7 +107,7 @@ public:
 
     void processData(cdata_ptr data);
 
-    sdata_ptr eventsToSend(uint32_t firstEvent);
+    std::vector<sdata_ptr> eventsToSend(uint32_t firstEvent);
 
     bool active() const { return active_; }
 
