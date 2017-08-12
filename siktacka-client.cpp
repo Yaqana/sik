@@ -173,10 +173,6 @@ int udp_socket(
     struct addrinfo server_addr_hints;
     struct addrinfo *server_addr_result;
 
-    int flags, sflags;
-    size_t server_len;
-    ssize_t snd_len, rcv_len;
-    socklen_t rcva_len;
     // 'converting' host/port in string to struct addrinfo
     (void) memset(&server_addr_hints, 0, sizeof(struct addrinfo));
     server_addr_hints.ai_family = AF_INET; // IPv4

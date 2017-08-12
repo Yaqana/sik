@@ -65,6 +65,10 @@ public:
 
     bool active() const { return active_; }
 
+    void activate() { active_ = true; }
+
+    void disactivate() {active_ = false;}
+
     uint8_t number() const { return number_; }
 
 
@@ -74,7 +78,7 @@ private:
     double head_y_;
     int8_t turn_dir_;
     uint32_t move_dir_;
-    bool active_;
+    bool active_ = false;
     uint8_t number_;
 };
 
@@ -124,6 +128,7 @@ private:
     std::map<std::string, player_ptr> players_;
     std::vector<event_ptr> events_;
     bool active_ = false;
+    uint8_t active_players_;
     uint32_t turningSpeed_;
     std::vector<std::string> ready_players_;
 

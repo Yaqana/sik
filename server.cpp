@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <iostream>
+#include <cassert>
 
 #include "server.h"
 
@@ -7,8 +8,8 @@
 
 void PlayerData::move(uint32_t turningSpeed) {
     move_dir_ = (move_dir_ + turningSpeed * turn_dir_) % NDEGREES;
-    head_x_ += cos(move_dir_);
-    head_y_ += sin(move_dir_);
+    head_x_ -= sin(move_dir_);
+    head_y_ -= cos(move_dir_);
 }
 
 GameState::GameState(time_t rand_seed, uint32_t maxx, uint32_t maxy, uint32_t turningSpeed) :
@@ -42,9 +43,11 @@ void GameState::startGame() {
     events_.push_back(event);
     for (auto &player : players_) {
         player_ptr p = player.second;
+        p->activate();
         event_ptr pixel(new Pixel((uint32_t) p->head_x(), (uint32_t) p->head_y(), p->number(), events_.size()));
         events_.push_back(pixel);
     }
+    active_players_ = players_.size();
 }
 
 void GameState::processData(cdata_ptr data) {
@@ -68,19 +71,29 @@ void GameState::processData(cdata_ptr data) {
 }
 
 void GameState::nextTurn() {
-    std::cout<<"Next Turn "<<get_timestamp()<<"\n";
-    for (auto &player : players_) {
-        std::pair<int32_t, int32_t> oldCoord = player.second->pixel();
-        player.second->move(turningSpeed_);
-        std::pair<int32_t, int32_t> newCoord = player.second->pixel();
-        if (newCoord.first < 0 || newCoord.first >= maxx_
-            || newCoord.second < 0 || newCoord.second >= maxy_) {
-            event_ptr ev(new PlayerEliminated(player.second->number(), events_.size()));
-            events_.push_back(ev);
-        } else if (oldCoord.first != newCoord.first || oldCoord.second != newCoord.second) {
-            event_ptr ev(new Pixel((uint32_t) newCoord.first, (uint32_t) newCoord.second, player.second->number(),
-                                   events_.size()));
-            events_.push_back(ev);
+    for (auto &p : players_) {
+        player_ptr player = p.second;
+       if (player->active()) {
+            std::pair<int32_t, int32_t> oldCoord = player->pixel();
+            player->move(turningSpeed_);
+            std::pair<int32_t, int32_t> newCoord = player->pixel();
+            if (newCoord.first < 0 || newCoord.first >= maxx_
+                || newCoord.second < 0 || newCoord.second >= maxy_) {
+                event_ptr ev(new PlayerEliminated(player->number(), events_.size()));
+                events_.push_back(ev);
+                std::cout<<" Player Eliminated "<<player->number()<<"\n";
+                player->disactivate();
+                active_players_--;
+                if (active_ < 2) {
+                    event_ptr game_over(new GameOver(events_.size()));
+                    events_.push_back(game_over);
+                    return;
+                }
+            } else if (oldCoord.first != newCoord.first || oldCoord.second != newCoord.second) {
+                event_ptr ev(new Pixel((uint32_t) newCoord.first, (uint32_t) newCoord.second, player->number(),
+                                       events_.size()));
+                events_.push_back(ev);
+            }
         }
     }
 };

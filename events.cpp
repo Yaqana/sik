@@ -35,7 +35,7 @@ NewGame::NewGame(char *buffer, size_t len, uint32_t event_no) {
             count += 1;
         }
         std::string player;
-        player.assign(buffer + ptr, count);
+        player.assign(buffer + ptr, count + 1);
         count++;
         ptr += count;
         count = 0;
@@ -125,8 +125,7 @@ size_t NewGame::dataToBuffer(char *buffer) {
     for (auto &p : players_) {
         const char* pname = p.c_str();
         printf("Wysylane imie: %s\n", pname);
-        memcpy(buffer+len, pname, p.length());
-        //memcpy(buffer+len+1, "\0", 1);
+        memcpy(buffer+len, pname, p.length() + 1);
         len += p.length() + 1;
     }
     printf("Wysylany bufer: %s\n", buffer);

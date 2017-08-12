@@ -21,8 +21,6 @@ namespace {
 
     std::shared_ptr<GameState> gstate;
 
-    std::queue<std::shared_ptr<SendData>> toSend;
-
     uint32_t width = 800;
     uint32_t height = 600;
     uint16_t port = 12345;
@@ -114,9 +112,8 @@ namespace {
         gstate->processData(data);
 
         std::vector<sdata_ptr> sdata_to_send = gstate->eventsToSend(data->next_event());
-        for (auto sdata : sdata_to_send) {
-            toSend.push(std::make_shared<SendData>(sdata, c, sock));
-            //std::cout<<sdata->events().size()<<"\n";
+        for (auto &s: sdata_to_send){
+            c->sendTo(s, sock);
         }
     }
 
@@ -133,11 +130,15 @@ namespace {
         process_cdata(client_address, c);
     }
 
+    /*
     void write_to_client() {
-        std::shared_ptr<SendData> s = toSend.front();
-        toSend.pop();
-        s->send();
-    }
+        if (!toSend.empty()) {
+            std::shared_ptr<SendData> s = toSend.front();
+            toSend.pop();
+            s->send();
+            std::cout<<"Wyslalem "<<get_timestamp()<<" liczba czekajacych: "<<toSend.size()<<"\n";
+        }
+    } */
 
     void snd_and_recv(int sock) {
         struct pollfd client;
@@ -158,14 +159,12 @@ namespace {
             else {
                 if (client.revents & POLLIN) {
                     read_from_client();
-                    if (!toSend.empty()) {
-                        client.events = POLLOUT;
-                    }
                 }
+                    /*
                 else if (client.revents & POLLOUT) {
                     write_to_client();
                     client.events = POLLIN;
-                }
+                } */
                 to_wait = std::max((next_send - get_timestamp())/1000, (int64_t )0);
             }
         }

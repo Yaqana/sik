@@ -24,8 +24,7 @@ size_t ClientData::toBuffer(char *buffer) {
     memcpy(buffer, &s_id, 8);
     memcpy(buffer + 8, &turn_direction_, 1); // nie trzeba zmieniac kolejnosci
     memcpy(buffer + 9, &event, 4);
-    memcpy(buffer + 13, player_name_.c_str(), player_name_.size());
-    memcpy(buffer + player_name_.size() + 13, "\0", 1);
+    memcpy(buffer + 13, player_name_.c_str(), player_name_.size() + 1);
     return 14 + player_name_.size();
 }
 
