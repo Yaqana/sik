@@ -36,6 +36,7 @@ namespace {
         while (*temp) {
             if (!isdigit(*temp))
                 fatal("%s powinien byc liczba dodatnia \n", string);
+            temp++;
         }
         return atoi(string);
     }
@@ -44,6 +45,7 @@ namespace {
         int opt;
         int p;
         while ((opt = getopt(argc, argv, "W:H:p:s:t:r:")) != -1) {
+            std::cout<<"nowa flaga: "<<opt<<"\n";
             switch (opt) {
                 case 'W':
                     width = (uint32_t) is_positive_int(optarg);

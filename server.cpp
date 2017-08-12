@@ -70,6 +70,36 @@ void GameState::processData(cdata_ptr data) {
     player->set_dir(data->turn_direction());
 }
 
+void GameState::eliminatePlayer(player_ptr player) {
+    event_ptr ev(new PlayerEliminated(player->number(), events_.size()));
+    events_.push_back(ev);
+    std::cout<<" Player Eliminated "<<player->number()<<"\n";
+    player->disactivate();
+    active_players_--;
+}
+
+void GameState::endGame() {
+    event_ptr game_over(new GameOver(events_.size()));
+    events_.push_back(game_over);
+    reset();
+}
+
+void GameState::reset() {
+    active_ = false;
+    for (auto &p: players_)
+        p.second->disactivate();
+    active_players_ = 0;
+    ready_players_.clear();
+    board_.clear();
+    gid_ = rand();
+    for (auto &p: players_) {
+        player_ptr player = p.second;
+        player->set_head_x((double)(rand() % maxx_) + 0.5);
+        player->set_head_y((double)(rand() % maxy_) + 0.5);
+        player->set_dir(rand() % NDEGREES);
+    }
+}
+
 void GameState::nextTurn() {
     for (auto &p : players_) {
         player_ptr player = p.second;
@@ -79,21 +109,20 @@ void GameState::nextTurn() {
             std::pair<int32_t, int32_t> newCoord = player->pixel();
             if (newCoord.first < 0 || newCoord.first >= maxx_
                 || newCoord.second < 0 || newCoord.second >= maxy_) {
-                event_ptr ev(new PlayerEliminated(player->number(), events_.size()));
-                events_.push_back(ev);
-                std::cout<<" Player Eliminated "<<player->number()<<"\n";
-                player->disactivate();
-                active_players_--;
-                if (active_ < 2) {
-                    event_ptr game_over(new GameOver(events_.size()));
-                    events_.push_back(game_over);
-                    return;
-                }
+                eliminatePlayer(player);
             } else if (oldCoord.first != newCoord.first || oldCoord.second != newCoord.second) {
                 event_ptr ev(new Pixel((uint32_t) newCoord.first, (uint32_t) newCoord.second, player->number(),
                                        events_.size()));
                 events_.push_back(ev);
+                if (board_.find(newCoord) != board_.end())
+                    eliminatePlayer(player);
+                else
+                    board_.insert(newCoord);
             }
+           if (active_players_ < 2) {
+               endGame();
+               return;
+           }
         }
     }
 };

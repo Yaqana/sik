@@ -71,6 +71,9 @@ public:
 
     uint8_t number() const { return number_; }
 
+    void set_head_x(double x) { head_x_ = x; }
+    void set_head_y(double y) { head_y_= y; }
+
 
 private:
     std::string player_name_;
@@ -143,6 +146,12 @@ private:
     player_ptr newPlayer(const std::string &player_name);
 
     void startGame();
+
+    void eliminatePlayer(player_ptr player);
+
+    void endGame();
+
+    void reset();
 };
 
 #endif //SERVER_H
