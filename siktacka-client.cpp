@@ -21,7 +21,7 @@ namespace {
     const int AHEAD = 0;
     const int RIGHT = 1;
     std::vector<std::string> players;
-    std::queue<event_ptr> events;
+    std::queue<EventPtr> events;
     std::string player_name, server;
     uint16_t server_port = 12345;
     uint16_t ui_port = 12346;
@@ -64,9 +64,9 @@ int ui_write(int sock){
         return 0;
     }
     char buffer[CLIENT_TO_UI_SIZE];
-    event_ptr event = events.front();
+    EventPtr event = events.front();
     events.pop();
-    size_t len = event->toGuiBuffer(buffer);
+    size_t len = event->ToGuiBuffer(buffer);
     if (write(sock, buffer, len) != len) {
         syserr("partial / failed write");
         return 1;
@@ -126,7 +126,7 @@ void server_read(int sock, struct sockaddr_in *server_address) {
             if (players.size() == 0) {
                 players = ev->players();
             }
-            ev->mapName(players);
+            ev->MapName(players);
             events.push(ev);
         }
     }

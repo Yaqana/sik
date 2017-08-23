@@ -129,7 +129,7 @@ private:
     uint32_t maxx_;
     uint32_t maxy_;
     std::map<std::string, player_ptr> players_;
-    std::vector<event_ptr> events_;
+    std::vector<EventPtr> events_;
     bool active_ = false;
     uint8_t active_players_;
     uint32_t turningSpeed_;

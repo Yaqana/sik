@@ -4,7 +4,7 @@
 #include <cctype>
 #include <cstdint>
 #include <string>
-#include <sys/time.h>
+
 #include "err.h"
 
 #define CLIENT_TO_UI_SIZE 64
@@ -17,7 +17,9 @@
 #define htonll(x) ((1==htonl(1)) ? (x) : ((uint64_t)htonl((x) & 0xFFFFFFFF) << 32) | htonl((x) >> 32))
 #define ntohll(x) ((1==ntohl(1)) ? (x) : ((uint64_t)ntohl((x) & 0xFFFFFFFF) << 32) | ntohl((x) >> 32))
 
+uint32_t getCrc(char* buffer, size_t len);
 int64_t get_timestamp();
 uint16_t validate_port(const std::string &port);
+
 
 #endif SIKTACKA_H

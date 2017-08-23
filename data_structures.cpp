@@ -2,10 +2,6 @@
 #include <iostream>
 #include "data_structures.h"
 
-#define NEW_GAME 0
-#define PIXEL 1
-#define PLAYER_ELIMINATED 2
-#define GAME_OVER 3
 
 namespace {
     // TODO remove
@@ -42,7 +38,7 @@ size_t ServerData::toBuffer(char *buffer) const {
     i = 4;
     for(auto &ev: events_) {
         char ev_buffer[EVENT_BUFFER_SIZE];
-        size_t len = ev->toServerBuffer(ev_buffer);
+        size_t len = ev->ToServerBuffer(ev_buffer);
         memcpy(buffer + i, ev_buffer, len);
         i += len;
     }
@@ -69,7 +65,7 @@ cdata_ptr buffer_to_client_data(char *buffer, size_t len) {
 }
 
 
-event_ptr buffer_to_event(char* buffer, size_t len) {
+EventPtr buffer_to_event(char* buffer, size_t len) {
     uint32_t ptr = 0;
     uint32_t ev_no = 0;
     uint32_t event_type = 0;
@@ -99,13 +95,13 @@ sdata_ptr buffer_to_server_data(char *buffer, size_t len) {
     uint32_t game_id;
     memcpy(&game_id, buffer, 4);
     ptr = 4;
-    std::vector<event_ptr> events;
+    std::vector<EventPtr> events;
     while (ptr < len) {
         uint32_t event_len2;
         memcpy(&event_len2, buffer + ptr, 4);
         uint32_t event_len = ntohl(event_len2);
         ptr += 4;
-        event_ptr e = buffer_to_event(buffer+ptr, event_len + 4);
+        EventPtr e = buffer_to_event(buffer+ptr, event_len + 4);
         ptr += event_len + 4;
         events.push_back(e);
     }

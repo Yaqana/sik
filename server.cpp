@@ -39,12 +39,12 @@ void GameState::startGame() {
     std::vector<std::string> players;
     for (auto &p: players_)
         players.push_back(p.first);
-    event_ptr event(new NewGame(maxx_, maxy_, std::move(players), events_.size()));
+    EventPtr event(new NewGame(maxx_, maxy_, std::move(players), events_.size()));
     events_.push_back(event);
     for (auto &player : players_) {
         player_ptr p = player.second;
         p->activate();
-        event_ptr pixel(new Pixel((uint32_t) p->head_x(), (uint32_t) p->head_y(), p->number(), events_.size()));
+        EventPtr pixel(new Pixel((uint32_t) p->head_x(), (uint32_t) p->head_y(), p->number(), events_.size()));
         events_.push_back(pixel);
     }
     active_players_ = players_.size();
@@ -71,7 +71,7 @@ void GameState::processData(cdata_ptr data) {
 }
 
 void GameState::eliminatePlayer(player_ptr player) {
-    event_ptr ev(new PlayerEliminated(player->number(), events_.size()));
+    EventPtr ev(new PlayerEliminated(player->number(), events_.size()));
     events_.push_back(ev);
     std::cout<<" Player Eliminated "<<player->number()<<"\n";
     player->disactivate();
@@ -79,7 +79,7 @@ void GameState::eliminatePlayer(player_ptr player) {
 }
 
 void GameState::endGame() {
-    event_ptr game_over(new GameOver(events_.size()));
+    EventPtr game_over(new GameOver(events_.size()));
     events_.push_back(game_over);
     reset();
 }
@@ -111,7 +111,7 @@ void GameState::nextTurn() {
                 || newCoord.second < 0 || newCoord.second >= maxy_) {
                 eliminatePlayer(player);
             } else if (oldCoord.first != newCoord.first || oldCoord.second != newCoord.second) {
-                event_ptr ev(new Pixel((uint32_t) newCoord.first, (uint32_t) newCoord.second, player->number(),
+                EventPtr ev(new Pixel((uint32_t) newCoord.first, (uint32_t) newCoord.second, player->number(),
                                        events_.size()));
                 events_.push_back(ev);
                 if (board_.find(newCoord) != board_.end())
@@ -130,7 +130,7 @@ void GameState::nextTurn() {
 std::vector<sdata_ptr> GameState::eventsToSend(uint32_t firstEvent) {
     std::vector<sdata_ptr> res;
     uint32_t len = 4;
-    std::vector<event_ptr > evs;
+    std::vector<EventPtr > evs;
     for (uint32_t it=firstEvent; it < events_.size(); it++) {
         if (len += events_[it]->len() > SERVER_TO_CLIENT_SIZE) {
             res.push_back(sdata_ptr(new ServerData(gid_, std::move(evs))));

@@ -26,21 +26,21 @@ typedef std::shared_ptr<ClientData> cdata_ptr;
 
 class ServerData {
 public:
-    ServerData(uint32_t game_id, const std::vector<event_ptr> &events):
+    ServerData(uint32_t game_id, const std::vector<EventPtr> &events):
             game_id_(game_id), events_(events) {};
     bool hasEvents() const { return events_.size() > 0; }
     uint32_t firstEvent() const { return hasEvents() ? events_[0]->event_no() : 0; }
-    std::vector<event_ptr> events() const { return events_; }
+    std::vector<EventPtr> events() const { return events_; }
     size_t toBuffer(char* buffer) const;
 private:
     uint32_t game_id_;
-    std::vector<event_ptr> events_;
+    std::vector<EventPtr> events_;
 };
 
 typedef  std::shared_ptr<ServerData> sdata_ptr;
 
 
-event_ptr buffer_to_event(char *buffer, size_t len);
+EventPtr buffer_to_event(char *buffer, size_t len);
 sdata_ptr buffer_to_server_data(char *buffer, size_t len);
 cdata_ptr buffer_to_client_data(char* buffer, size_t len);
 
