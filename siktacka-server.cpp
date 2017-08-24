@@ -31,7 +31,7 @@ namespace {
     int wait_time_ms;
     int sock;
 
-    int32_t is_positive_int(char *string) {
+    int32_t IsPositiveInt(char *string) {
         char *temp = string;
         while (*temp) {
             if (!isdigit(*temp))
@@ -41,32 +41,32 @@ namespace {
         return atoi(string);
     }
 
-    void parse_arguments(int argc, char **argv) {
+    void ParseArguments(int argc, char **argv) {
         int opt;
         int p;
         while ((opt = getopt(argc, argv, "W:H:p:s:t:r:")) != -1) {
             std::cout<<"nowa flaga: "<<opt<<"\n";
             switch (opt) {
                 case 'W':
-                    width = (uint32_t) is_positive_int(optarg);
+                    width = (uint32_t) IsPositiveInt(optarg);
                     break;
                 case 'H':
-                    height = (uint32_t) is_positive_int(optarg);
+                    height = (uint32_t) IsPositiveInt(optarg);
                     break;
                 case 'p':
-                    p = is_positive_int(optarg);
+                    p = IsPositiveInt(optarg);
                     if (p > 65535)
                         fatal("niepoprawny port %d \n", p);
                     port = (uint16_t) p;
                     break;
                 case 's':
-                    speed = (uint32_t) is_positive_int(optarg);
+                    speed = (uint32_t) IsPositiveInt(optarg);
                     break;
                 case 't':
-                    turning_speed = (uint32_t) is_positive_int(optarg);
+                    turning_speed = (uint32_t) IsPositiveInt(optarg);
                     break;
                 case 'r':
-                    seed = (uint32_t) is_positive_int(optarg);
+                    seed = (uint32_t) IsPositiveInt(optarg);
                     break;
                 default: /* '?' */
                     fatal("niepoprawna flaga %c \n", opt);
@@ -76,7 +76,11 @@ namespace {
         wait_time_ms = wait_time_us / 1000;
     }
 
-    void udp_socket() {
+    void UdpSocket() {
+        sock = socket(AF_INET, SOCK_DGRAM, 0);
+        if (sock < 0)
+            syserr("socket");
+
         struct sockaddr_in my_address;
         my_address.sin_family = AF_INET; // IPv4
         my_address.sin_addr.s_addr = htonl(INADDR_ANY); // listening on all interfaces
@@ -88,7 +92,7 @@ namespace {
 
     }
 
-    void process_cdata(const struct sockaddr_in &player_address, cdata_ptr data) {
+    void ProcessCdata(const struct sockaddr_in &player_address, cdata_ptr data) {
         //std::cout<<data->player_name()<<" "<<data->next_event()<<" "<<data->session_id()<<" "<<(int)(data->turn_direction())<<"\n"; // TODO
         bool new_client = true;
 
@@ -96,7 +100,7 @@ namespace {
 
         // check if the client is new
         for (auto client: clients) {
-            if (client->addr() == player_address.sin_addr.s_addr && client->port() == player_address.sin_port) {
+            if (client->Addr() == player_address.sin_addr.s_addr && client->Port() == player_address.sin_port) {
                 if (client->session_id() > data->session_id()) // Old datagram
                     return;
                 new_client = false;
@@ -111,15 +115,15 @@ namespace {
             clients.push_back(c);
         }
 
-        gstate->processData(data);
+        gstate->ProcessData(data);
 
-        std::vector<sdata_ptr> sdata_to_send = gstate->eventsToSend(data->next_event());
+        std::vector<sdata_ptr> sdata_to_send = gstate->EventsToSend(data->next_event());
         for (auto &s: sdata_to_send){
-            c->sendTo(s, sock);
+            c->SendTo(s, sock);
         }
     }
 
-    void read_from_client() {
+    void ReadFromClient() {
         struct sockaddr_in client_address;
         socklen_t rcva_len;
         rcva_len = (socklen_t) sizeof(client_address);
@@ -129,7 +133,7 @@ namespace {
         len = recvfrom(sock, buffer, sizeof(buffer), flags,
                        (struct sockaddr *) &client_address, &rcva_len);
         cdata_ptr c = buffer_to_client_data(buffer, len);
-        process_cdata(client_address, c);
+        ProcessCdata(client_address, c);
     }
 
     /*
@@ -142,7 +146,7 @@ namespace {
         }
     } */
 
-    void snd_and_recv(int sock) {
+    void SendAndRecv(int sock) {
         struct pollfd client;
         client.fd = sock;
         client.events = POLLIN;
@@ -155,12 +159,12 @@ namespace {
             if (ret < 1) {
                 next_send = get_timestamp() + wait_time_us;
                 if(gstate->active())
-                    gstate->nextTurn();
+                    gstate->NextTurn();
                 to_wait = wait_time_ms;
             }
             else {
                 if (client.revents & POLLIN) {
-                    read_from_client();
+                    ReadFromClient();
                 }
                     /*
                 else if (client.revents & POLLOUT) {
@@ -177,19 +181,13 @@ int main(int argc, char *argv[]) {
 
     seed = time(NULL);
 
-    parse_arguments(argc, argv);
-
-    std::cout<<"parsed\n";
+    ParseArguments(argc, argv);
 
     gstate = std::make_shared<GameState>(seed, height, width, turning_speed);
 
-    // udp configuration
-    sock = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sock < 0)
-        syserr("socket");
-    udp_socket();
+    UdpSocket();
 
-    snd_and_recv(sock);
+    SendAndRecv(sock);
 
     return 0;
 }

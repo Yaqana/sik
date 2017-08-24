@@ -14,22 +14,31 @@ namespace {
 }
 
 EventPtr Event::NewEvent(char *buffer, size_t len) {
-    uint32_t ptr = 0;
+    uint32_t ptr = 4; // skipping len field (already parsed)
     uint32_t ev_no = 0;
     uint32_t event_type = 0;
     memcpy(&ev_no, buffer + ptr, 4);
     ptr += 4;
     memcpy(&event_type, buffer + ptr, 1);
     ptr += 1;
+
+    uint32_t expected_crc = getCrc(buffer, len - 4);
+    uint32_t real_crc;
+    memcpy(&real_crc, buffer + len - 4, 4);
+    if (ntohl(real_crc) != expected_crc){
+        return nullptr;
+    }
+
+    size_t event_len = len - ptr -4;
     switch (event_type) {
         case 0:  {
-            return NewGame::New(buffer+5, len-5, ntohl(ev_no));
+            return NewGame::New(buffer+ptr, event_len, ntohl(ev_no));
         }
         case 1: {
-            return Pixel::New(buffer+5, len-5, ntohl(ev_no));
+            return Pixel::New(buffer+ptr, event_len, ntohl(ev_no));
         }
         case 2: {
-            return PlayerEliminated::New(buffer+5, len-5, ntohl(ev_no));
+            return PlayerEliminated::New(buffer+ptr, event_len, ntohl(ev_no));
         }
         case 3: {
             return GameOver::New(ntohl(ev_no));
@@ -52,6 +61,7 @@ size_t Event::ToServerBuffer(char *buffer) const {
 
     uint32_t crc = getCrc(buffer, len + 4);
     uint32_t crc_hton = htonl(crc);
+
     memcpy(buffer + len + 4, &crc_hton, 4);
 
     return len + 8;
@@ -77,7 +87,7 @@ std::shared_ptr<NewGame> NewGame::New(char *buffer, size_t len, uint32_t event_n
 
     size_t count = 0;
     std::vector<std::string> players;
-    while (ptr < len - 4) { // CRC
+    while (ptr < len) { // CRC
         while (*(buffer + ptr + count) >= 33 && *(buffer + ptr + count) <= 126) {
             count += 1;
         }
@@ -105,7 +115,6 @@ size_t NewGame::DataToBuffer(char *buffer) const {
 
     for (auto &p : players_) {
         const char* pname = p.c_str();
-        printf("Wysylane imie: %s\n", pname);
         memcpy(buffer+len, pname, p.length() + 1);
         len += p.length() + 1;
     }

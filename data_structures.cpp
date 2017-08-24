@@ -64,32 +64,6 @@ cdata_ptr buffer_to_client_data(char *buffer, size_t len) {
     return c_data;
 }
 
-
-EventPtr buffer_to_event(char* buffer, size_t len) {
-    uint32_t ptr = 0;
-    uint32_t ev_no = 0;
-    uint32_t event_type = 0;
-    memcpy(&ev_no, buffer + ptr, 4);
-    ptr += 4;
-    memcpy(&event_type, buffer + ptr, 1);
-    ptr += 1;
-    switch (event_type) {
-        case NEW_GAME:  {
-            return std::make_shared<NewGame>(buffer+5, len-5, ntohl(ev_no));
-        }
-        case PIXEL: {
-            return std::make_shared<Pixel>(buffer+5, len-5, ntohl(ev_no));
-        }
-        case PLAYER_ELIMINATED: {
-            return std::make_shared<PlayerEliminated>(buffer+5, len-5, ntohl(ev_no));
-        }
-        case GAME_OVER: {
-            return std::make_shared<GameOver>(ntohl(ev_no));
-        }
-        default: return nullptr;
-    }
-}
-
 sdata_ptr buffer_to_server_data(char *buffer, size_t len) {
     uint16_t ptr = 0;
     uint32_t game_id;
@@ -100,10 +74,12 @@ sdata_ptr buffer_to_server_data(char *buffer, size_t len) {
         uint32_t event_len2;
         memcpy(&event_len2, buffer + ptr, 4);
         uint32_t event_len = ntohl(event_len2);
-        ptr += 4;
-        EventPtr e = buffer_to_event(buffer+ptr, event_len + 4);
-        ptr += event_len + 4;
-        events.push_back(e);
+        EventPtr e = Event::NewEvent(buffer+ptr, event_len + 8);
+        ptr += event_len + 8;
+        if (e) {
+            events.push_back(e);
+            std::cout<<"Nowy event\n";
+        }
     }
     // TODO jeszcze crc
     return std::make_shared<ServerData>(ntohl(game_id), std::move(events));

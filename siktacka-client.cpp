@@ -13,13 +13,13 @@
 #include "data_structures.h"
 
 namespace {
-    const int UI = 0;
-    const int SERVER = 1;
-    const int SEND_INTERVAL_ms = 20; // co ile wysylany jest komunikat
-    const int SEND_INTERVAL_us = 20000;
-    const int LEFT = -1;
-    const int AHEAD = 0;
-    const int RIGHT = 1;
+    constexpr int UI = 0;
+    constexpr int SERVER = 1;
+    constexpr int SEND_INTERVAL_ms = 20; // co ile wysylany jest komunikat
+    constexpr int SEND_INTERVAL_us = 20000;
+    constexpr int LEFT = -1;
+    constexpr int AHEAD = 0;
+    constexpr int RIGHT = 1;
     std::vector<std::string> players;
     std::queue<EventPtr> events;
     std::string player_name, server;
@@ -48,7 +48,7 @@ void parse_port(const std::string &to_parse, std::string &server, uint16_t &port
         port = validate_port(p);
 }
 
-int parse_arguments(int argc, char* argv[]){
+int ParseArguments(int argc, char *argv[]){
     player_name = argv[1];
     parse_port(argv[2], server, server_port);
     if(argc > 3) {
@@ -118,8 +118,8 @@ void server_read(int sock, struct sockaddr_in *server_address) {
     sdata_ptr data = buffer_to_server_data(buffer2, (size_t)len);
     for (auto &ev : data->events()) {
         if (ev->event_no() > cdata->next_event()) {
-            std::cout << "niespojne zdarzenia" << ev->event_no() << " " << cdata->next_event() << "\n";
-            return; // dostalismy niespojny kawalek zdarzen
+            // Inconsecutive sequence of events.
+            return;
         }
         if (ev -> event_no() == cdata->next_event()) {
             cdata->inc_next_event();
@@ -207,7 +207,7 @@ int main(int argc, char* argv[]) {
     if (argc < 3)
         fatal("za malo argumentow\n");
 
-    int ret = parse_arguments(argc, argv);
+    int ret = ParseArguments(argc, argv);
     if (ret < 0)
         fatal("Invalid arguments");
     std::cout<<player_name<<" "<<server<<" "<<server_port<<" "<<ui_server<<" "<<ui_port<<"\n";

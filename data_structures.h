@@ -39,8 +39,6 @@ private:
 
 typedef  std::shared_ptr<ServerData> sdata_ptr;
 
-
-EventPtr buffer_to_event(char *buffer, size_t len);
 sdata_ptr buffer_to_server_data(char *buffer, size_t len);
 cdata_ptr buffer_to_client_data(char* buffer, size_t len);
 

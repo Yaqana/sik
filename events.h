@@ -6,11 +6,9 @@
 #include <memory>
 #include <vector>
 
-using EventPtr = std::shared_ptr<Event>;
-
 class Event {
 public:
-    static EventPtr NewEvent(char* buffer, size_t len);
+    static std::shared_ptr<Event> NewEvent(char* buffer, size_t len);
 
     size_t ToServerBuffer(char *buffer) const;
     virtual size_t ToGuiBuffer(char *buffer) const = 0;
@@ -30,6 +28,8 @@ protected:
 private:
         virtual size_t DataToBuffer(char *buffer) const = 0;
 };
+
+using EventPtr = std::shared_ptr<Event>;
 
 class NewGame: public Event {
 public:
