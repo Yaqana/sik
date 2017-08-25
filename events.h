@@ -18,6 +18,7 @@ public:
     uint32_t event_no() { return event_no_; }
     uint32_t len() const { return len_; }
     virtual std::vector<std::string> players() const { return std::vector<std::string>(); }
+    virtual bool IsGameOver() { return false; };
 
 protected:
     virtual uint8_t EventType() const = 0;
@@ -101,6 +102,8 @@ public:
     GameOver() = delete;
 
     size_t ToGuiBuffer(char *buffer) const;
+
+    bool IsGameOver() override { return true; }
 
 protected:
     uint8_t EventType() const override { return 3; }

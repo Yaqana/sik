@@ -22,7 +22,7 @@ EventPtr Event::NewEvent(char *buffer, size_t len) {
     memcpy(&event_type, buffer + ptr, 1);
     ptr += 1;
 
-    uint32_t expected_crc = getCrc(buffer, len - 4);
+    uint32_t expected_crc = GetCrc(buffer, len - 4);
     uint32_t real_crc;
     memcpy(&real_crc, buffer + len - 4, 4);
     if (ntohl(real_crc) != expected_crc){
@@ -59,7 +59,7 @@ size_t Event::ToServerBuffer(char *buffer) const {
     uint32_t len_hton = htonl(len);
     memcpy(buffer, &len_hton, 4);
 
-    uint32_t crc = getCrc(buffer, len + 4);
+    uint32_t crc = GetCrc(buffer, len + 4);
     uint32_t crc_hton = htonl(crc);
 
     memcpy(buffer + len + 4, &crc_hton, 4);

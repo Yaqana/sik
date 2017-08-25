@@ -32,34 +32,34 @@ namespace {
             printf("%02X ", *(buffer+i));
         }
     }
-    cdata_ptr cdata;
+    ClientDataPtr cdata;
+    int ui_sock;
+    int server_sock;
+    struct sockaddr_in server_address;
 
 }
 
-void parse_port(const std::string &to_parse, std::string &server, uint16_t &port){
+void ParsePort(const std::string &to_parse, std::string *server, uint16_t *port){
     unsigned long pos = to_parse.find(":");
     if (pos == std::string::npos) {
-        server = to_parse;
+        *server = to_parse;
         return;
     }
-    server = to_parse.substr(0, pos);
+    *server = to_parse.substr(0, pos);
     std::string p = to_parse.substr(pos + 1, to_parse.size());
     if (p.size() > 0)
-        port = validate_port(p);
+       *port = ValidatePort(p);
 }
 
-int ParseArguments(int argc, char *argv[]){
+void ParseArguments(int argc, char *argv[]){
     player_name = argv[1];
-    parse_port(argv[2], server, server_port);
+    ParsePort(argv[2], &server, &server_port);
     if(argc > 3) {
-        parse_port(argv[3], ui_server, ui_port);
+        ParsePort(argv[3], &ui_server, &ui_port);
     }
-
-
-    return 0;
 }
 
-int ui_write(int sock){
+int UiWrite(){
     if (events.empty()) {
         return 0;
     }
@@ -67,47 +67,48 @@ int ui_write(int sock){
     EventPtr event = events.front();
     events.pop();
     size_t len = event->ToGuiBuffer(buffer);
-    if (write(sock, buffer, len) != len) {
+    if (event->IsGameOver()) {
+        //cdata->reset_next_event();
+    }
+    if (write(ui_sock, buffer, len) != (ssize_t)len) {
         syserr("partial / failed write");
         return 1;
     }
     return 0;
 }
 
-int ui_read(int sock, char* buffer){
-    memset(buffer, 0, UI_TO_CLIENT_SIZE);
-    ssize_t len = read(sock, buffer, UI_TO_CLIENT_SIZE - 1);
-    std::cout<<buffer;
+int UiRead(){
+    char buffer[UI_TO_CLIENT_SIZE];
+    ssize_t len = read(ui_sock, buffer, UI_TO_CLIENT_SIZE - 1);
     if (len < 0) {
         syserr("read");
         return 1;
     }
-    if(strcmp(buffer, "LEFT_KEY_DOWN\n") == 0) {
+    if(strncmp(buffer, "LEFT_KEY_DOWN\n", (size_t)len) == 0) {
         cdata->set_turn_direction(LEFT);
-    }
-    else if (strcmp(buffer, "RIGHT_KEY_DOWN\n")== 0) {
+    } else if (strncmp(buffer, "RIGHT_KEY_DOWN\n", (size_t)len)== 0) {
         cdata->set_turn_direction(RIGHT);
-    }
-    else
+    } else {
         cdata->set_turn_direction(AHEAD);
+    }
     return 0;
 }
 
-int server_send(int sock, struct sockaddr_in *server_address){
+int ServerSend(struct sockaddr_in *server_address){
     int sflags = 0;
     char c_data[CLIENT_TO_SERVER_SIZE];
-    size_t msg_len = cdata->toBuffer(c_data);
+    size_t msg_len = cdata->ToBuffer(c_data);
     socklen_t snda_len = (socklen_t) sizeof(*server_address);
-    ssize_t len = sendto(sock, c_data, msg_len, sflags,
+    ssize_t len = sendto(server_sock, c_data, msg_len, sflags,
                          (struct sockaddr *) server_address, snda_len);
-    if (len != msg_len) {
+    if (len != (ssize_t )msg_len) {
         syserr("partial / failed write");
         return 1;
     }
     return 0;
 }
 
-void server_read(int sock, struct sockaddr_in *server_address) {
+void ServerRead(int sock, struct sockaddr_in *server_address) {
     socklen_t rcva_len = (socklen_t) sizeof (server_address);
     int flags = 0;
     char buffer2[SERVER_TO_CLIENT_SIZE];
@@ -115,7 +116,7 @@ void server_read(int sock, struct sockaddr_in *server_address) {
                            (struct sockaddr *) &server_address, &rcva_len);
     if (len < 0)
         syserr("error on datagram from client socket");
-    sdata_ptr data = buffer_to_server_data(buffer2, (size_t)len);
+    ServerDataPtr data = buffer_to_server_data(buffer2, (size_t)len);
     for (auto &ev : data->events()) {
         if (ev->event_no() > cdata->next_event()) {
             // Inconsecutive sequence of events.
@@ -128,11 +129,12 @@ void server_read(int sock, struct sockaddr_in *server_address) {
             }
             ev->MapName(players);
             events.push(ev);
+            std::cout<< typeid(*ev).name()<<"\n";
         }
     }
 }
 
-int tcp_socket(const std::string &server, uint16_t port) {
+int TcpSocket(const std::string &server, uint16_t port) {
     int err;
     int sock;
     struct addrinfo ui_addr_hints;
@@ -164,12 +166,7 @@ int tcp_socket(const std::string &server, uint16_t port) {
     return sock;
 }
 
-int udp_socket(
-        const std::string &server,
-        uint16_t port,
-        struct sockaddr_in *my_address,
-        struct sockaddr_in *srvr_address)
-{
+int UdpSocket() {
     struct addrinfo server_addr_hints;
     struct addrinfo *server_addr_result;
 
@@ -187,10 +184,10 @@ int udp_socket(
         syserr("getaddrinfo");
     }
 
-    my_address->sin_family = AF_INET; // IPv4
-    my_address->sin_addr.s_addr =
+    server_address.sin_family = AF_INET; // IPv4
+    server_address.sin_addr.s_addr =
             ((struct sockaddr_in*) (server_addr_result->ai_addr))->sin_addr.s_addr; // address IP
-    my_address->sin_port = htons(port); // port from the command line
+    server_address.sin_port = htons(server_port);
 
     freeaddrinfo(server_addr_result);
 
@@ -201,33 +198,7 @@ int udp_socket(
 
 }
 
-
-int main(int argc, char* argv[]) {
-    /* parse arguments */
-    if (argc < 3)
-        fatal("za malo argumentow\n");
-
-    int ret = ParseArguments(argc, argv);
-    if (ret < 0)
-        fatal("Invalid arguments");
-    std::cout<<player_name<<" "<<server<<" "<<server_port<<" "<<ui_server<<" "<<ui_port<<"\n";
-
-    uint64_t session_id = get_timestamp();
-    int8_t turn = 0;
-    uint32_t next_event = 0;
-
-    // UDP configuration
-    struct sockaddr_in server_address;
-    struct sockaddr_in srvr_address;
-    int server_sock = udp_socket(server, server_port, &server_address, &srvr_address);
-
-    // TCP configuration
-    int ui_sock = tcp_socket(ui_server, ui_port);
-
-    //client data configuration
-     cdata = std::make_shared<ClientData>
-            (session_id, turn, next_event, player_name);
-
+void SendAndReceive() {
     //poll configuration
     struct pollfd client[2];
     client[SERVER].fd = server_sock;
@@ -237,28 +208,24 @@ int main(int argc, char* argv[]) {
     client[SERVER].revents = 0;
     client[UI].revents = 0;
 
-    int active_players = 0;
-    int64_t next_send = get_timestamp() + SEND_INTERVAL_us;
+    int64_t next_send = GetTimestamp() + SEND_INTERVAL_us;
     int to_wait = SEND_INTERVAL_ms;
 
-    char buffer_ui_receive[UI_TO_CLIENT_SIZE];
+    int ret;
 
-    ret = 1; //TODO sztuczna petla
-
-    while(ret){ //TODO do kiedy pętla
+    while(true){
         client[UI].revents = 0;
         client[SERVER].revents = 0;
         ret = poll(client, 2, to_wait);
         if(ret < 1) {
-            next_send = get_timestamp() + SEND_INTERVAL_us;
+            next_send = GetTimestamp() + SEND_INTERVAL_us;
             client[SERVER].events = POLLOUT;
-            //server_send(server_sock, data, &server_address);
-            ret=1; // TODO taka sztuczna petla
+            ret=1;
             to_wait=SEND_INTERVAL_ms;
         }
         else {
             if (client[UI].revents & POLLIN) {
-                ui_read(ui_sock, buffer_ui_receive);
+                UiRead();
                 client[SERVER].events |= POLLOUT;
                 if (events.empty())
                     client[UI].events = POLLIN;
@@ -266,24 +233,46 @@ int main(int argc, char* argv[]) {
                     client[UI].events = POLLOUT;
             }
             if (client[UI].revents & POLLOUT) {
-                ui_write(ui_sock);
+                UiWrite();
                 if (events.empty())
                     client[UI].events = POLLIN;
             }
             if (client[SERVER].revents & POLLOUT) {
-                server_send(server_sock, &server_address);
+                ServerSend(&server_address);
                 client[SERVER].events = POLLIN;
-                //std::cout<<get_timestamp()<<"\n";
             }
             if (client[SERVER].revents & POLLIN){
-                server_read(server_sock, &server_address);
+                ServerRead(server_sock, &server_address);
                 client[UI].events |= POLLOUT;
-                //client[SERVER].events = POLLOUT;
             }
-            to_wait = std::max((next_send - get_timestamp())/1000, (int64_t)0);
+            to_wait = std::max((next_send - GetTimestamp())/1000, (int64_t)0);
         }
     }
+}
 
+
+int main(int argc, char* argv[]) {
+
+    if (argc < 3)
+        fatal("Too few parameters\n");
+
+    ParseArguments(argc, argv);
+
+    uint64_t session_id = (uint64_t ) GetTimestamp();
+    int8_t turn = 0;
+    uint32_t next_event = 0;
+
+    // UDP configuration
+    server_sock = UdpSocket();
+
+    // TCP configuration
+    ui_sock = TcpSocket(ui_server, ui_port);
+
+    //client data configuration
+     cdata = std::make_shared<ClientData>
+            (session_id, turn, next_event, player_name);
+
+    SendAndReceive();
 
     return 0;
 }

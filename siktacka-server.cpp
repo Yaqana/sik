@@ -92,7 +92,7 @@ namespace {
 
     }
 
-    void ProcessCdata(const struct sockaddr_in &player_address, cdata_ptr data) {
+    void ProcessCdata(const struct sockaddr_in &player_address, ClientDataPtr data) {
         //std::cout<<data->player_name()<<" "<<data->next_event()<<" "<<data->session_id()<<" "<<(int)(data->turn_direction())<<"\n"; // TODO
         bool new_client = true;
 
@@ -100,7 +100,7 @@ namespace {
 
         // check if the client is new
         for (auto client: clients) {
-            if (client->Addr() == player_address.sin_addr.s_addr && client->Port() == player_address.sin_port) {
+            if (client->addr() == player_address.sin_addr.s_addr && client->port() == player_address.sin_port) {
                 if (client->session_id() > data->session_id()) // Old datagram
                     return;
                 new_client = false;
@@ -117,7 +117,7 @@ namespace {
 
         gstate->ProcessData(data);
 
-        std::vector<sdata_ptr> sdata_to_send = gstate->EventsToSend(data->next_event());
+        std::vector<ServerDataPtr> sdata_to_send = gstate->EventsToSend(data->next_event());
         for (auto &s: sdata_to_send){
             c->SendTo(s, sock);
         }
@@ -132,7 +132,7 @@ namespace {
         int flags = 0;
         len = recvfrom(sock, buffer, sizeof(buffer), flags,
                        (struct sockaddr *) &client_address, &rcva_len);
-        cdata_ptr c = buffer_to_client_data(buffer, len);
+        ClientDataPtr c = buffer_to_client_data(buffer, len);
         ProcessCdata(client_address, c);
     }
 
@@ -152,12 +152,12 @@ namespace {
         client.events = POLLIN;
         int ret, to_wait;
         to_wait = wait_time_ms;
-        int64_t next_send = get_timestamp() + wait_time_us;
+        int64_t next_send = GetTimestamp() + wait_time_us;
         while(true) { // TODO
             client.revents = 0;
             ret = poll(&client, 1, to_wait);
             if (ret < 1) {
-                next_send = get_timestamp() + wait_time_us;
+                next_send = GetTimestamp() + wait_time_us;
                 if(gstate->active())
                     gstate->NextTurn();
                 to_wait = wait_time_ms;
@@ -171,7 +171,7 @@ namespace {
                     write_to_client();
                     client.events = POLLIN;
                 } */
-                to_wait = std::max((next_send - get_timestamp())/1000, (int64_t )0);
+                to_wait = std::max((next_send - GetTimestamp())/1000, (int64_t )0);
             }
         }
     }

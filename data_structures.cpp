@@ -14,24 +14,24 @@ namespace {
     }
 }
 
-size_t ClientData::toBuffer(char *buffer) {
+ClientData::ClientData(uint64_t session_id, int8_t turn_direction, uint32_t next_event,
+                       const std::string &player_name):
+        session_id_(session_id),
+        turn_direction_(turn_direction),
+        next_event_(next_event),
+        player_name_(player_name) {};
+
+size_t ClientData::ToBuffer(char *buffer) {
     uint64_t s_id = htonll(session_id_);
     uint32_t event = htonl(next_event_);
     memcpy(buffer, &s_id, 8);
-    memcpy(buffer + 8, &turn_direction_, 1); // nie trzeba zmieniac kolejnosci
+    memcpy(buffer + 8, &turn_direction_, 1);
     memcpy(buffer + 9, &event, 4);
     memcpy(buffer + 13, player_name_.c_str(), player_name_.size() + 1);
     return 14 + player_name_.size();
 }
 
-ClientData::ClientData(uint64_t session_id, int8_t turn_direction, uint32_t next_event,
-                       const std::string &player_name):
-    session_id_(session_id),
-    turn_direction_(turn_direction),
-    next_event_(next_event),
-    player_name_(player_name) {};
-
-size_t ServerData::toBuffer(char *buffer) const {
+size_t ServerData::ToBuffer(char *buffer) const {
     size_t i = 0;
     uint32_t game_id = htonl(game_id_);
     memcpy(buffer, &game_id, 4);
@@ -45,7 +45,7 @@ size_t ServerData::toBuffer(char *buffer) const {
     return i;
 }
 
-cdata_ptr buffer_to_client_data(char *buffer, size_t len) {
+ClientDataPtr buffer_to_client_data(char *buffer, size_t len) {
     uint64_t s_id;
     int8_t td;
     uint32_t event;
@@ -54,7 +54,7 @@ cdata_ptr buffer_to_client_data(char *buffer, size_t len) {
     memcpy(&event, buffer + 9, 4);
     char* pname = (char *)malloc(len-12);
     memcpy(pname, buffer + 13, len - 13);
-    cdata_ptr c_data = std::make_shared<ClientData>(
+    ClientDataPtr c_data = std::make_shared<ClientData>(
             ntohll(s_id),
             td,
             ntohl(event),
@@ -64,7 +64,7 @@ cdata_ptr buffer_to_client_data(char *buffer, size_t len) {
     return c_data;
 }
 
-sdata_ptr buffer_to_server_data(char *buffer, size_t len) {
+ServerDataPtr buffer_to_server_data(char *buffer, size_t len) {
     uint16_t ptr = 0;
     uint32_t game_id;
     memcpy(&game_id, buffer, 4);
@@ -78,7 +78,6 @@ sdata_ptr buffer_to_server_data(char *buffer, size_t len) {
         ptr += event_len + 8;
         if (e) {
             events.push_back(e);
-            std::cout<<"Nowy event\n";
         }
     }
     // TODO jeszcze crc

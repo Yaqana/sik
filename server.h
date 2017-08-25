@@ -19,34 +19,6 @@ namespace {
     }
 }
 
-class Client{
-public:
-    Client(const struct sockaddr_in &addres, int64_t session_id):
-            addres_(addres), session_id_(session_id) {};
-
-    void SendTo(sdata_ptr server_data, int sock) const;
-
-    int64_t session_id() const { return session_id_; }
-    uint32_t Addr() const { return addres_.sin_addr.s_addr; }
-    uint16_t Port() const { return addres_.sin_port; }
-
-private:
-    struct sockaddr_in addres_;
-    int64_t session_id_;
-};
-
-class SendData {
-public:
-    SendData(sdata_ptr server_data, std::shared_ptr<Client> client, int sock):
-            server_data_(server_data), client_(client), sock_(sock) {
-    }
-    void send() const { client_->SendTo(server_data_, sock_);};
-private:
-    sdata_ptr server_data_;
-    std::shared_ptr<Client> client_;
-    int sock_;
-};
-
 class PlayerData {
 public:
 
@@ -71,21 +43,21 @@ public:
 
 private:
     std::string player_name_;
+    uint8_t number_;
     double head_x_;
     double head_y_;
     int8_t turn_dir_;
     uint32_t move_dir_;
     bool active_ = false;
-    uint8_t number_;
 };
 
-using player_ptr = std::shared_ptr<PlayerData>;
+using PlayerPtr = std::shared_ptr<PlayerData>;
 
 class Random {
 public:
     Random(time_t seed) : random_(seed) {}
 
-    uint32_t next() {
+    uint32_t Next() {
         uint32_t res = (uint32_t )random_;
         random_ = (random_ * multipl_) % modulo_;
         return res;
@@ -103,43 +75,53 @@ public:
     GameState(time_t rand_seed, uint32_t maxx, uint32_t maxy, uint32_t turningSpeed);
 
     void NextTurn();
-    void ProcessData(cdata_ptr data);
+    void ProcessData(ClientDataPtr data);
 
     bool ExistPlayer(const std::string &player_name) const;
-    std::vector<sdata_ptr> EventsToSend(uint32_t firstEvent);
+    std::vector<ServerDataPtr> EventsToSend(uint32_t firstEvent);
     bool active() const { return active_; }
 
 
 private:
-    struct SortPlayers {
-        bool operator()(const player_ptr p1, const player_ptr p2) const {
-            return p1->player_name().compare(p2->player_name()) < 0;
-        }
-    };
-
-    uint32_t Rand() { return rand_.next(); }
-    player_ptr NewPlayer(const std::string &player_name);
+    uint32_t Rand() { return rand_.Next(); }
+    PlayerPtr NewPlayer(const std::string &player_name);
     void StartGame();
-    void EliminatePlayer(player_ptr player);
+    void EliminatePlayer(PlayerPtr player);
     void EndGame();
     void Reset();
+    Random rand_;
 
     uint32_t gid_;
     uint32_t maxx_;
     uint32_t maxy_;
-    std::map<std::string, player_ptr> players_;
+    uint32_t turningSpeed_;
+    std::map<std::string, PlayerPtr> players_;
+    std::vector<std::string> ready_players_; // Players who are ready to play.
+    uint32_t active_players_number_; // Not yet eliminated players.
     std::vector<EventPtr> events_;
     bool active_ = false;
-    uint32_t active_players_;
-    uint32_t turningSpeed_;
-    std::vector<std::string> ready_players_;
-
-    //przechowuje informacje o stanie planszy
-    //byc moze unordered_map jesli trzeba bedzie trzymac gracza
     std::set<std::pair<uint32_t, uint32_t>> board_;
-
-    Random rand_;
 };
 
-#endif //SERVER_H
+
+class Client{
+public:
+    Client(const struct sockaddr_in &addres, uint64_t session_id):
+            addres_(addres), session_id_(session_id) {};
+
+    void SendTo(ServerDataPtr server_data, int sock) const;
+
+    uint64_t session_id() const { return session_id_; }
+    uint32_t addr() const { return addres_.sin_addr.s_addr; }
+    uint16_t port() const { return addres_.sin_port; }
+
+
+private:
+
+    struct sockaddr_in addres_;
+    uint64_t session_id_;
+
+};
+
+#endif // SERVER_H
 
