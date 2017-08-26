@@ -68,7 +68,7 @@ int UiWrite(){
     events.pop();
     size_t len = event->ToGuiBuffer(buffer);
     if (event->IsGameOver()) {
-        //cdata->reset_next_event();
+        cdata->reset();
     }
     if (write(ui_sock, buffer, len) != (ssize_t)len) {
         syserr("partial / failed write");
@@ -117,10 +117,15 @@ void ServerRead(int sock, struct sockaddr_in *server_address) {
     if (len < 0)
         syserr("error on datagram from client socket");
     ServerDataPtr data = buffer_to_server_data(buffer2, (size_t)len);
+    if (cdata->game_id() == 0){
+        cdata->set_game_id (data->game_id());
+    } else if (cdata->game_id() != data->game_id()) {
+        return; // Ignore datagram from other game.
+    }
     for (auto &ev : data->events()) {
-        if (ev->event_no() > cdata->next_event()) {
+        if (ev->event_no() != cdata->next_event()) {
             // Inconsecutive sequence of events.
-            return;
+            continue;
         }
         if (ev -> event_no() == cdata->next_event()) {
             cdata->inc_next_event();
@@ -191,9 +196,11 @@ int UdpSocket() {
 
     freeaddrinfo(server_addr_result);
 
-    int sock = socket(PF_INET, SOCK_DGRAM, 0);
+    int sock = socket(AF_INET6, SOCK_DGRAM, 0);
     if (sock < 0)
         syserr("socket");
+    bool optval = false;
+    setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, &optval, sizeof(optval));
     return sock;
 
 }

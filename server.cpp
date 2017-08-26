@@ -6,7 +6,7 @@
 
 #define NDEGREES 360
 
-void Client::SendTo(ServerDataPtr server_data, int sock) const {
+void Client::SendTo(ServerDataPtr server_data, int sock) {
     char buffer[SERVER_TO_CLIENT_SIZE];
     size_t len = server_data->ToBuffer(buffer);
     socklen_t snda_len = (socklen_t) sizeof(addres_);
@@ -19,9 +19,9 @@ void Client::SendTo(ServerDataPtr server_data, int sock) const {
 }
 
 void PlayerData::Move(uint32_t turningSpeed) {
-    move_dir_ = (move_dir_ + turningSpeed * turn_dir_) % NDEGREES;
-    head_x_ -= sin(move_dir_);
-    head_y_ -= cos(move_dir_);
+    move_dir_ = (move_dir_ + turningSpeed * (- turn_dir_)) % NDEGREES;
+    head_x_ += cos(move_dir_);
+    head_y_ += sin(move_dir_);
 }
 
 GameState::GameState(time_t rand_seed, uint32_t maxx, uint32_t maxy, uint32_t turningSpeed) :
@@ -30,6 +30,7 @@ GameState::GameState(time_t rand_seed, uint32_t maxx, uint32_t maxy, uint32_t tu
 }
 
 void GameState::NextTurn() {
+    size_t events_size = events_.size();
     for (auto &p : players_) {
         PlayerPtr player = p.second;
         if (player->active()) {
@@ -50,16 +51,37 @@ void GameState::NextTurn() {
                     board_.insert(newCoord);
                 }
             }
-
-            if (active_players_number_ < 2) {
-                EndGame();
-                return;
-            }
         }
     }
+    if (active_players_number_ < 2) {
+        EndGame();
+    }
+    is_pending_ = events_size < events_.size();
 };
 
+void GameState::ResetIfGameOver() {
+    if (!game_over_)
+        return;
+    active_ = false;
+    game_over_ = false;
+    for (auto &p: players_)
+        p.second->Disactivate();
+    active_players_number_ = 0;
+    ready_players_.clear();
+    board_.clear();
+    events_.clear();
+    gid_ = Rand();
+    for (auto &p: players_) {
+        PlayerPtr player = p.second;
+        player->set_head_x((double)(Rand() % maxx_) + 0.5);
+        player->set_head_y((double)(Rand() % maxy_) + 0.5);
+        player->set_turn_dir(Rand() % NDEGREES);
+    }
+}
+
 void GameState::ProcessData(ClientDataPtr data) {
+    if (data->player_name() == "")
+        return;
     auto it = players_.find(data->player_name());
     PlayerPtr player;
     if (it == players_.end()) {
@@ -113,10 +135,12 @@ PlayerPtr GameState::NewPlayer(const std::string &player_name) {
 }
 
 void GameState::StartGame() {
+    std::cout<<"GameState::StartGame()\n";
     active_ = true;
     std::vector<std::string> players;
     for (auto &p: players_)
         players.push_back(p.first);
+    std::cout<<"events.size() = " << events_.size() << "\n";
     EventPtr event(new NewGame(maxx_, maxy_, std::move(players), (uint32_t )events_.size()));
     events_.push_back(event);
     for (auto &player : players_) {
@@ -138,22 +162,6 @@ void GameState::EliminatePlayer(PlayerPtr player) {
 void GameState::EndGame() {
     EventPtr game_over(new GameOver((uint32_t )events_.size()));
     events_.push_back(game_over);
-    Reset();
+    game_over_ = true;
 }
 
-void GameState::Reset() {
-    active_ = false;
-    for (auto &p: players_)
-        p.second->Disactivate();
-    active_players_number_ = 0;
-    ready_players_.clear();
-    board_.clear();
-    events_.clear();
-    gid_ = Rand();
-    for (auto &p: players_) {
-        PlayerPtr player = p.second;
-        player->set_head_x((double)(Rand() % maxx_) + 0.5);
-        player->set_head_y((double)(Rand() % maxy_) + 0.5);
-        player->set_turn_dir(Rand() % NDEGREES);
-    }
-}

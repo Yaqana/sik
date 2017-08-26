@@ -9,6 +9,8 @@
 #include "siktacka.h"
 #include "data_structures.h"
 
+const uint64_t kmicroseconds = 1000000;
+
 namespace {
     void hexdump(char *buffer, size_t len) {
         printf("\n");
@@ -75,12 +77,13 @@ public:
     GameState(time_t rand_seed, uint32_t maxx, uint32_t maxy, uint32_t turningSpeed);
 
     void NextTurn();
+    void ResetIfGameOver();
     void ProcessData(ClientDataPtr data);
 
     bool ExistPlayer(const std::string &player_name) const;
     std::vector<ServerDataPtr> EventsToSend(uint32_t firstEvent);
     bool active() const { return active_; }
-
+    bool is_pending() const { return is_pending_; }
 
 private:
     uint32_t Rand() { return rand_.Next(); }
@@ -88,7 +91,6 @@ private:
     void StartGame();
     void EliminatePlayer(PlayerPtr player);
     void EndGame();
-    void Reset();
     Random rand_;
 
     uint32_t gid_;
@@ -100,7 +102,9 @@ private:
     uint32_t active_players_number_; // Not yet eliminated players.
     std::vector<EventPtr> events_;
     bool active_ = false;
+    bool game_over_ = false;
     std::set<std::pair<uint32_t, uint32_t>> board_;
+    bool is_pending_ = false;
 };
 
 
@@ -109,18 +113,24 @@ public:
     Client(const struct sockaddr_in &addres, uint64_t session_id):
             addres_(addres), session_id_(session_id) {};
 
-    void SendTo(ServerDataPtr server_data, int sock) const;
+    void SendTo(ServerDataPtr server_data, int sock);
 
     uint64_t session_id() const { return session_id_; }
     uint32_t addr() const { return addres_.sin_addr.s_addr; }
     uint16_t port() const { return addres_.sin_port; }
+    bool IsDisactive() const { return timestamp_ < GetTimestamp() - 2 * kmicroseconds; }
+    uint32_t next_event_no() const { return next_event_no_; }
+
+    void set_timestamp(int64_t timestamp) { timestamp_ = timestamp; }
+    void set_next_event_no (uint32_t next_event_no) { next_event_no_ = next_event_no; }
 
 
 private:
 
     struct sockaddr_in addres_;
     uint64_t session_id_;
-
+    int64_t timestamp_; // last time client was active
+    uint32_t next_event_no_;
 };
 
 #endif // SERVER_H

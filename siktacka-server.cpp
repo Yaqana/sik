@@ -17,7 +17,8 @@ extern int optind, opterr, optopt;
 
 namespace {
 
-    std::vector<std::shared_ptr<Client>> clients;
+    std::set<std::shared_ptr<Client>> clients;
+    uint32_t had_game_over = 0;
 
     std::shared_ptr<GameState> gstate;
 
@@ -39,6 +40,18 @@ namespace {
             temp++;
         }
         return atoi(string);
+    }
+
+    void UpdateClients() {
+        for (auto c: clients) {
+            if (c->IsDisactive()) {
+                clients.erase(c);
+            }
+            std::vector<ServerDataPtr> sdata_to_send = gstate->EventsToSend(c->next_event_no());
+            for (auto &s: sdata_to_send){
+                c->SendTo(s, sock);
+            }
+        }
     }
 
     void ParseArguments(int argc, char **argv) {
@@ -80,9 +93,8 @@ namespace {
         sock = socket(AF_INET, SOCK_DGRAM, 0);
         if (sock < 0)
             syserr("socket");
-
         struct sockaddr_in my_address;
-        my_address.sin_family = AF_INET; // IPv4
+        my_address.sin_family = AF_UNSPEC; // IPv4 and IPv6
         my_address.sin_addr.s_addr = htonl(INADDR_ANY); // listening on all interfaces
         my_address.sin_port = htons(port);
 
@@ -93,34 +105,37 @@ namespace {
     }
 
     void ProcessCdata(const struct sockaddr_in &player_address, ClientDataPtr data) {
-        //std::cout<<data->player_name()<<" "<<data->next_event()<<" "<<data->session_id()<<" "<<(int)(data->turn_direction())<<"\n"; // TODO
-        bool new_client = true;
 
-        std::shared_ptr<Client> c;
+        bool new_client = true;
+        std::shared_ptr<Client> client;
 
         // check if the client is new
-        for (auto client: clients) {
-            if (client->addr() == player_address.sin_addr.s_addr && client->port() == player_address.sin_port) {
-                if (client->session_id() > data->session_id()) // Old datagram
+        for (auto c: clients) {
+            if (c->addr() == player_address.sin_addr.s_addr && c->port() == player_address.sin_port) {
+                if (c->session_id() > data->session_id()) // Old datagram
                     return;
                 new_client = false;
-                c = client;
+                client = c;
                 break;
             }
         }
 
         // valid new client
         if (new_client) {
-            c = std::make_shared<Client>(player_address, data->session_id());
-            clients.push_back(c);
+            client = std::make_shared<Client>(player_address, data->session_id());
+            clients.insert(client);
         }
+
+        client->set_timestamp(GetTimestamp());
+        client->set_next_event_no(data->next_event());
 
         gstate->ProcessData(data);
 
         std::vector<ServerDataPtr> sdata_to_send = gstate->EventsToSend(data->next_event());
         for (auto &s: sdata_to_send){
-            c->SendTo(s, sock);
+            client->SendTo(s, sock);
         }
+
     }
 
     void ReadFromClient() {
@@ -136,17 +151,7 @@ namespace {
         ProcessCdata(client_address, c);
     }
 
-    /*
-    void write_to_client() {
-        if (!toSend.empty()) {
-            std::shared_ptr<SendData> s = toSend.front();
-            toSend.pop();
-            s->send();
-            std::cout<<"Wyslalem "<<get_timestamp()<<" liczba czekajacych: "<<toSend.size()<<"\n";
-        }
-    } */
-
-    void SendAndRecv(int sock) {
+    void SendAndRecv() {
         struct pollfd client;
         client.fd = sock;
         client.events = POLLIN;
@@ -158,9 +163,13 @@ namespace {
             ret = poll(&client, 1, to_wait);
             if (ret < 1) {
                 next_send = GetTimestamp() + wait_time_us;
+                to_wait = wait_time_ms;
                 if(gstate->active())
                     gstate->NextTurn();
-                to_wait = wait_time_ms;
+                if (gstate->is_pending()) {
+                    UpdateClients();
+                }
+                gstate->ResetIfGameOver();
             }
             else {
                 if (client.revents & POLLIN) {
@@ -183,11 +192,11 @@ int main(int argc, char *argv[]) {
 
     ParseArguments(argc, argv);
 
-    gstate = std::make_shared<GameState>(seed, height, width, turning_speed);
+    gstate = std::make_shared<GameState>(seed, width, height, turning_speed);
 
     UdpSocket();
 
-    SendAndRecv(sock);
+    SendAndRecv();
 
     return 0;
 }

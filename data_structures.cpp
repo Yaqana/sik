@@ -80,7 +80,6 @@ ServerDataPtr buffer_to_server_data(char *buffer, size_t len) {
             events.push_back(e);
         }
     }
-    // TODO jeszcze crc
     return std::make_shared<ServerData>(ntohl(game_id), std::move(events));
 }
 
