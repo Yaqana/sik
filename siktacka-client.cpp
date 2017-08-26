@@ -68,8 +68,7 @@ int UiWrite(){
     events.pop();
     size_t len = event->ToGuiBuffer(buffer);
     if (event->IsGameOver()) {
-        cdata->reset_next_event();
-        return 0;
+        //cdata->reset_next_event();
     }
     if (write(ui_sock, buffer, len) != (ssize_t)len) {
         syserr("partial / failed write");

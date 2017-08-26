@@ -17,7 +17,7 @@ extern int optind, opterr, optopt;
 
 namespace {
 
-    std::vector<PlayerPtr > clients;
+    std::vector<std::shared_ptr<Client>> clients;
 
     std::shared_ptr<GameState> gstate;
 
@@ -93,9 +93,10 @@ namespace {
     }
 
     void ProcessCdata(const struct sockaddr_in &player_address, ClientDataPtr data) {
+        //std::cout<<data->player_name()<<" "<<data->next_event()<<" "<<data->session_id()<<" "<<(int)(data->turn_direction())<<"\n"; // TODO
         bool new_client = true;
 
-        PlayerPtr c;
+        std::shared_ptr<Client> c;
 
         // check if the client is new
         for (auto client: clients) {
@@ -110,11 +111,16 @@ namespace {
 
         // valid new client
         if (new_client) {
-            c = std::make_shared<Player>(player_address, data->session_id());
+            c = std::make_shared<Client>(player_address, data->session_id());
             clients.push_back(c);
         }
 
-        gstate->ProcessData(data, c);
+        gstate->ProcessData(data);
+
+        std::vector<ServerDataPtr> sdata_to_send = gstate->EventsToSend(data->next_event());
+        for (auto &s: sdata_to_send){
+            c->SendTo(s, sock);
+        }
     }
 
     void ReadFromClient() {
@@ -130,7 +136,17 @@ namespace {
         ProcessCdata(client_address, c);
     }
 
-    void SendAndRecv() {
+    /*
+    void write_to_client() {
+        if (!toSend.empty()) {
+            std::shared_ptr<SendData> s = toSend.front();
+            toSend.pop();
+            s->send();
+            std::cout<<"Wyslalem "<<get_timestamp()<<" liczba czekajacych: "<<toSend.size()<<"\n";
+        }
+    } */
+
+    void SendAndRecv(int sock) {
         struct pollfd client;
         client.fd = sock;
         client.events = POLLIN;
@@ -167,11 +183,11 @@ int main(int argc, char *argv[]) {
 
     ParseArguments(argc, argv);
 
+    gstate = std::make_shared<GameState>(seed, height, width, turning_speed);
+
     UdpSocket();
 
-    gstate = std::make_shared<GameState>(seed, height, width, turning_speed, sock);
-
-    SendAndRecv();
+    SendAndRecv(sock);
 
     return 0;
 }
