@@ -17,7 +17,7 @@ extern int optind, opterr, optopt;
 
 namespace {
 
-    std::vector<std::shared_ptr<Client>> clients;
+    std::vector<PlayerPtr > clients;
 
     std::shared_ptr<GameState> gstate;
 
@@ -93,10 +93,9 @@ namespace {
     }
 
     void ProcessCdata(const struct sockaddr_in &player_address, ClientDataPtr data) {
-        //std::cout<<data->player_name()<<" "<<data->next_event()<<" "<<data->session_id()<<" "<<(int)(data->turn_direction())<<"\n"; // TODO
         bool new_client = true;
 
-        std::shared_ptr<Client> c;
+        PlayerPtr c;
 
         // check if the client is new
         for (auto client: clients) {
@@ -111,16 +110,11 @@ namespace {
 
         // valid new client
         if (new_client) {
-            c = std::make_shared<Client>(player_address, data->session_id());
+            c = std::make_shared<Player>(player_address, data->session_id());
             clients.push_back(c);
         }
 
-        gstate->ProcessData(data);
-
-        std::vector<ServerDataPtr> sdata_to_send = gstate->EventsToSend(data->next_event());
-        for (auto &s: sdata_to_send){
-            c->SendTo(s, sock);
-        }
+        gstate->ProcessData(data, c);
     }
 
     void ReadFromClient() {
@@ -136,17 +130,7 @@ namespace {
         ProcessCdata(client_address, c);
     }
 
-    /*
-    void write_to_client() {
-        if (!toSend.empty()) {
-            std::shared_ptr<SendData> s = toSend.front();
-            toSend.pop();
-            s->send();
-            std::cout<<"Wyslalem "<<get_timestamp()<<" liczba czekajacych: "<<toSend.size()<<"\n";
-        }
-    } */
-
-    void SendAndRecv(int sock) {
+    void SendAndRecv() {
         struct pollfd client;
         client.fd = sock;
         client.events = POLLIN;
@@ -183,11 +167,11 @@ int main(int argc, char *argv[]) {
 
     ParseArguments(argc, argv);
 
-    gstate = std::make_shared<GameState>(seed, height, width, turning_speed);
-
     UdpSocket();
 
-    SendAndRecv(sock);
+    gstate = std::make_shared<GameState>(seed, height, width, turning_speed, sock);
+
+    SendAndRecv();
 
     return 0;
 }

@@ -19,26 +19,32 @@ namespace {
     }
 }
 
-class PlayerData {
+class Player {
 public:
 
-    PlayerData(const std::string &player_name, uint8_t number, const double &head_x, const double &head_y, uint32_t dir) :
-            player_name_(player_name), number_(number), head_x_(head_x), head_y_(head_y), move_dir_(dir) {};
+    Player (const struct sockaddr_in &addres, uint64_t session_id) :
+            addres_(addres), session_id_(session_id) {};
 
     void Move(uint32_t turningSpeed);
     void Activate() { active_ = true; }
     void Disactivate() {active_ = false;}
+    void SendTo(ServerDataPtr server_data, int sock) const;
 
-    void set_turn_dir(int8_t turn_dir) { turn_dir_ = turn_dir; }
-    void set_head_x(double x) { head_x_ = x; }
-    void set_head_y(double y) { head_y_= y; }
-
+    bool had_game_over() const { return had_game_over_; }
+    uint64_t session_id() const { return session_id_; }
+    uint32_t addr() const { return addres_.sin_addr.s_addr; }
+    uint16_t port() const { return addres_.sin_port; }
     std::string player_name() const { return player_name_; }
     double head_x() const { return head_x_; }
     double head_y() const { return head_y_; }
     std::pair<int, int> pixel() const { return std::make_pair((int)head_x_, (int)head_y_); }
     bool active() const { return active_; }
     uint8_t number() const { return number_; }
+
+    void set_had_game_over(bool had_game_over) { had_game_over_ = had_game_over; }
+    void set_turn_dir(int8_t turn_dir) { turn_dir_ = turn_dir; }
+    void Reset(double x, double y, uint32_t move_dir);
+    void set_details(const std::string &player_name, uint8_t  number, double head_x, double head_y, uint32_t move_dir);
 
 
 private:
@@ -49,9 +55,12 @@ private:
     int8_t turn_dir_;
     uint32_t move_dir_;
     bool active_ = false;
+    struct sockaddr_in addres_;
+    uint64_t session_id_;
+    bool had_game_over_;
 };
 
-using PlayerPtr = std::shared_ptr<PlayerData>;
+using PlayerPtr = std::shared_ptr<Player>;
 
 class Random {
 public:
@@ -72,19 +81,19 @@ private:
 
 class GameState {
 public:
-    GameState(time_t rand_seed, uint32_t maxx, uint32_t maxy, uint32_t turningSpeed);
+    GameState(time_t rand_seed, uint32_t maxx, uint32_t maxy, uint32_t turningSpeed, int sock);
 
     void NextTurn();
-    void ProcessData(ClientDataPtr data);
+    void ProcessData(ClientDataPtr data, PlayerPtr player);
 
     bool ExistPlayer(const std::string &player_name) const;
-    std::vector<ServerDataPtr> EventsToSend(uint32_t firstEvent);
     bool active() const { return active_; }
 
 
 private:
     uint32_t Rand() { return rand_.Next(); }
-    PlayerPtr NewPlayer(const std::string &player_name);
+    void SendData (uint32_t , PlayerPtr player);
+    void NewPlayer(const std::string &player_name, PlayerPtr player);
     void StartGame();
     void EliminatePlayer(PlayerPtr player);
     void EndGame();
@@ -95,33 +104,16 @@ private:
     uint32_t maxx_;
     uint32_t maxy_;
     uint32_t turningSpeed_;
+    int sock_;
     std::map<std::string, PlayerPtr> players_;
     std::vector<std::string> ready_players_; // Players who are ready to play.
     uint32_t active_players_number_; // Not yet eliminated players.
     std::vector<EventPtr> events_;
     bool active_ = false;
     std::set<std::pair<uint32_t, uint32_t>> board_;
+    uint32_t game_overs_sent_;
 };
 
-
-class Client{
-public:
-    Client(const struct sockaddr_in &addres, uint64_t session_id):
-            addres_(addres), session_id_(session_id) {};
-
-    void SendTo(ServerDataPtr server_data, int sock) const;
-
-    uint64_t session_id() const { return session_id_; }
-    uint32_t addr() const { return addres_.sin_addr.s_addr; }
-    uint16_t port() const { return addres_.sin_port; }
-
-
-private:
-
-    struct sockaddr_in addres_;
-    uint64_t session_id_;
-
-};
 
 #endif // SERVER_H
 
