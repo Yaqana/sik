@@ -10,6 +10,7 @@
 #include <iostream>
 #include <zconf.h>
 #include <queue>
+#include <netinet/tcp.h>
 #include "data_structures.h"
 
 namespace {
@@ -26,12 +27,6 @@ namespace {
     uint16_t server_port = 12345;
     uint16_t ui_port = 12346;
     std::string ui_server = "localhost";
-    // TODO remove
-    void hexdump(char* buffer, size_t len){
-        for (size_t i = 0; i < len; i++){
-            printf("%02X ", *(buffer+i));
-        }
-    }
     ClientDataPtr cdata;
     int ui_sock;
     int server_sock;
@@ -129,12 +124,11 @@ void ServerRead(int sock, struct sockaddr_in *server_address) {
         }
         if (ev -> event_no() == cdata->next_event()) {
             cdata->inc_next_event();
-            if (players.size() == 0) {
+            if (ev->IsNewGame()) {
                 players = ev->players();
             }
             ev->MapName(players);
             events.push(ev);
-            std::cout<< typeid(*ev).name()<<"\n";
         }
     }
 }
@@ -162,10 +156,16 @@ int TcpSocket(const std::string &server, uint16_t port) {
 
     sock = socket(ui_addr_result->ai_family, ui_addr_result->ai_socktype, ui_addr_result->ai_protocol);
     if (sock < 0)
-        syserr("socket");
+        syserr("Creatrion of socket failed.");
+
+    int flag = 1;
+    int result = setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int));
+    if (result < 0){
+        syserr("Setting socket options faield.");
+    }
 
     if (connect(sock, ui_addr_result->ai_addr, ui_addr_result->ai_addrlen) < 0)
-        syserr("connect");
+        syserr("Connect with gui failed.");
 
     freeaddrinfo(ui_addr_result);
     return sock;
@@ -196,11 +196,9 @@ int UdpSocket() {
 
     freeaddrinfo(server_addr_result);
 
-    int sock = socket(AF_INET6, SOCK_DGRAM, 0);
+    int sock = socket(AF_INET, SOCK_DGRAM, 0);
     if (sock < 0)
-        syserr("socket");
-    bool optval = false;
-    setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, &optval, sizeof(optval));
+        syserr("Creatrion of socket failed.");
     return sock;
 
 }

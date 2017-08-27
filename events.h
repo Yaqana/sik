@@ -18,7 +18,8 @@ public:
     uint32_t event_no() { return event_no_; }
     uint32_t len() const { return len_; }
     virtual std::vector<std::string> players() const { return std::vector<std::string>(); }
-    virtual bool IsGameOver() { return false; };
+    virtual bool IsGameOver() const { return false; };
+    virtual bool IsNewGame() const { return false; }
 
 protected:
     virtual uint8_t EventType() const = 0;
@@ -37,7 +38,8 @@ public:
     static std::shared_ptr<NewGame> New(char* buffer, size_t len, uint32_t event_no);
 
     NewGame(uint32_t maxx, uint32_t maxy, const std::vector<std::string> &players, uint32_t event_no);
-    NewGame() = delete;
+
+    bool IsNewGame() const override { return true; }
 
     size_t ToGuiBuffer(char *buffer) const override;
     std::vector<std::string> players() const { return players_; }
@@ -103,7 +105,7 @@ public:
 
     size_t ToGuiBuffer(char *buffer) const;
 
-    bool IsGameOver() override { return true; }
+    bool IsGameOver() const override { return true; }
 
 protected:
     uint8_t EventType() const override { return 3; }

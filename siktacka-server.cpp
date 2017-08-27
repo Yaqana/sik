@@ -27,7 +27,7 @@ namespace {
     uint16_t port = 12345;
     uint32_t speed = 50;
     uint32_t turning_speed = 6;
-    time_t seed;
+    uint64_t seed;
     int wait_time_us;
     int wait_time_ms;
     int sock;
@@ -46,10 +46,14 @@ namespace {
         for (auto c: clients) {
             if (c->IsDisactive()) {
                 clients.erase(c);
+                gstate->RemovePlayer(c->player());
+                continue;
             }
-            std::vector<ServerDataPtr> sdata_to_send = gstate->EventsToSend(c->next_event_no());
-            for (auto &s: sdata_to_send){
-                c->SendTo(s, sock);
+            if (gstate->is_pending()) {
+                std::vector<ServerDataPtr> sdata_to_send = gstate->EventsToSend(c->next_event_no());
+                for (auto &s: sdata_to_send) {
+                    c->SendTo(s, sock);
+                }
             }
         }
     }
@@ -58,7 +62,6 @@ namespace {
         int opt;
         int p;
         while ((opt = getopt(argc, argv, "W:H:p:s:t:r:")) != -1) {
-            std::cout<<"nowa flaga: "<<opt<<"\n";
             switch (opt) {
                 case 'W':
                     width = (uint32_t) IsPositiveInt(optarg);
@@ -112,8 +115,9 @@ namespace {
         // check if the client is new
         for (auto c: clients) {
             if (c->addr() == player_address.sin_addr.s_addr && c->port() == player_address.sin_port) {
-                if (c->session_id() > data->session_id()) // Old datagram
+                if (c->session_id() > data->session_id()) { // Old datagram
                     return;
+                }
                 new_client = false;
                 client = c;
                 break;
@@ -129,7 +133,10 @@ namespace {
         client->set_timestamp(GetTimestamp());
         client->set_next_event_no(data->next_event());
 
-        gstate->ProcessData(data);
+        PlayerPtr player = gstate->ProcessData(data, client->player());
+        if (player){
+            client->set_player(player);
+        }
 
         std::vector<ServerDataPtr> sdata_to_send = gstate->EventsToSend(data->next_event());
         for (auto &s: sdata_to_send){
@@ -166,9 +173,7 @@ namespace {
                 to_wait = wait_time_ms;
                 if(gstate->active())
                     gstate->NextTurn();
-                if (gstate->is_pending()) {
-                    UpdateClients();
-                }
+                UpdateClients();
                 gstate->ResetIfGameOver();
             }
             else {
@@ -188,13 +193,15 @@ namespace {
 }
 int main(int argc, char *argv[]) {
 
-    seed = time(NULL);
+    seed = (uint64_t)time(NULL);
 
     ParseArguments(argc, argv);
 
     gstate = std::make_shared<GameState>(seed, width, height, turning_speed);
 
     UdpSocket();
+
+    gstate->ResetIfGameOver();
 
     SendAndRecv();
 

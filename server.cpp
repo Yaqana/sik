@@ -19,15 +19,13 @@ void Client::SendTo(ServerDataPtr server_data, int sock) {
 }
 
 void PlayerData::Move(uint32_t turningSpeed) {
-    move_dir_ = (move_dir_ + turningSpeed * (- turn_dir_)) % NDEGREES;
-    head_x_ += cos(move_dir_);
-    head_y_ += sin(move_dir_);
+    move_dir_ = (move_dir_ + turningSpeed * turn_dir_ + 360) % NDEGREES;
+    head_x_ += cos(M_PI * move_dir_ / 180);
+    head_y_ += sin(M_PI * move_dir_ / 180);
 }
 
-GameState::GameState(time_t rand_seed, uint32_t maxx, uint32_t maxy, uint32_t turningSpeed) :
-        rand_(Random(rand_seed)), maxx_(maxx), maxy_(maxy), turningSpeed_(turningSpeed) {
-    gid_ = Rand();
-}
+GameState::GameState(uint64_t rand_seed, uint32_t maxx, uint32_t maxy, uint32_t turningSpeed) :
+        rand_(Random(rand_seed)), maxx_(maxx), maxy_(maxy), turningSpeed_(turningSpeed) {}
 
 void GameState::NextTurn() {
     size_t events_size = events_.size();
@@ -70,24 +68,17 @@ void GameState::ResetIfGameOver() {
     ready_players_.clear();
     board_.clear();
     events_.clear();
-    gid_ = Rand();
-    for (auto &p: players_) {
-        PlayerPtr player = p.second;
-        player->set_head_x((double)(Rand() % maxx_) + 0.5);
-        player->set_head_y((double)(Rand() % maxy_) + 0.5);
-        player->set_turn_dir(Rand() % NDEGREES);
-    }
+    gid_ = (uint32_t )Rand();
 }
 
-void GameState::ProcessData(ClientDataPtr data) {
-    if (data->player_name() == "")
-        return;
-    auto it = players_.find(data->player_name());
-    PlayerPtr player;
-    if (it == players_.end()) {
+PlayerPtr GameState::ProcessData(ClientDataPtr data, PlayerPtr player) {
+    PlayerPtr res;
+    if (data->player_name() == "") {
+        return res;
+    }
+    if (!player) {
         player = NewPlayer(data->player_name());
-    } else {
-        player = it->second;
+        res = player;
     }
     if (data->turn_direction() != 0 && !active_) {
         auto ready = find(ready_players_.begin(), ready_players_.end(), data->player_name());
@@ -99,14 +90,7 @@ void GameState::ProcessData(ClientDataPtr data) {
         }
     }
     player->set_turn_dir(data->turn_direction());
-}
-
-bool GameState::ExistPlayer(const std::string &player_name) const {
-    for (auto &p : players_) {
-        if (p.first == player_name)
-            return true;
-    }
-    return false;
+    return res;
 }
 
 std::vector<ServerDataPtr> GameState::EventsToSend(uint32_t firstEvent) {
@@ -128,19 +112,17 @@ std::vector<ServerDataPtr> GameState::EventsToSend(uint32_t firstEvent) {
 
 PlayerPtr GameState::NewPlayer(const std::string &player_name) {
     PlayerPtr player = std::make_shared<PlayerData>(
-            player_name, players_.size(), (double) (Rand() % maxx_) + 0.5,
-            (double) (Rand() % maxy_) + 0.5, Rand() % 360);
+            player_name, players_.size());
     players_.insert(std::make_pair(player_name, player));
     return player;
 }
 
 void GameState::StartGame() {
-    std::cout<<"GameState::StartGame()\n";
     active_ = true;
+    ResetPlayers();
     std::vector<std::string> players;
     for (auto &p: players_)
         players.push_back(p.first);
-    std::cout<<"events.size() = " << events_.size() << "\n";
     EventPtr event(new NewGame(maxx_, maxy_, std::move(players), (uint32_t )events_.size()));
     events_.push_back(event);
     for (auto &player : players_) {
@@ -163,5 +145,31 @@ void GameState::EndGame() {
     EventPtr game_over(new GameOver((uint32_t )events_.size()));
     events_.push_back(game_over);
     game_over_ = true;
+}
+
+void GameState::RemovePlayer(PlayerPtr player) {
+    auto p = players_.find(player->player_name());
+    if (p != players_.end()){
+        if (p->second->active()){
+            active_players_number_--;
+        }
+        players_.erase(p);
+    }
+    auto pl = find(ready_players_.begin(), ready_players_.end(), player->player_name());
+    if (pl != ready_players_.end()){
+        ready_players_.erase(pl);
+    }
+}
+
+void GameState::ResetPlayers() {
+    uint8_t number = 0;
+    for (auto &p: players_) {
+        PlayerPtr player = p.second;
+        player->set_head_x((double)(Rand() % maxx_) + 0.5);
+        player->set_head_y((double)(Rand() % maxy_) + 0.5);
+        player->set_move_dir((uint32_t )(Rand() % NDEGREES));
+        player->set_number(number);
+        ++number;
+    }
 }
 

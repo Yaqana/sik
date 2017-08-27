@@ -78,6 +78,8 @@ ServerDataPtr buffer_to_server_data(char *buffer, size_t len) {
         ptr += event_len + 8;
         if (e) {
             events.push_back(e);
+        } else {
+            break;
         }
     }
     return std::make_shared<ServerData>(ntohl(game_id), std::move(events));
