@@ -1,6 +1,11 @@
 #include <algorithm>
+#include <stdlib.h>
 #include <netdb.h>
+#include <errno.h>
+#include <stdarg.h>
 #include <poll.h>
+#include <string>
+#include <lzma.h>
 #include <cstring>
 #include <iostream>
 #include <zconf.h>
@@ -143,10 +148,10 @@ int TcpSocket(const std::string &server, uint16_t port) {
             &ui_addr_hints,
             &ui_addr_result);
     if (err == EAI_SYSTEM) { // system error
-        syserr("getaddrinfo: %s", gai_strerror(err));
+        syserr("TCP getaddrinfo: %s", gai_strerror(err));
     }
     else if (err != 0) { // other error (host not found, etc.)
-        fatal("getaddrinfo: %s", gai_strerror(err));
+        fatal("TCP getaddrinfo: %s", gai_strerror(err));
     }
 
     sock = socket(ui_addr_result->ai_family, ui_addr_result->ai_socktype, ui_addr_result->ai_protocol);
@@ -181,7 +186,7 @@ int UdpSocket() {
     server_addr_hints.ai_canonname = NULL;
     server_addr_hints.ai_next = NULL;
     if (getaddrinfo(server.c_str(), NULL, &server_addr_hints, &server_addr_result) != 0) {
-        syserr("getaddrinfo");
+        syserr("UDP getaddrinfo");
     }
 
     server_address.sin_family = AF_INET; // IPv4
