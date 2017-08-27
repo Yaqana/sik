@@ -2,16 +2,23 @@
 #include <iostream>
 #include "data_structures.h"
 
-
-namespace {
-    // TODO remove
-    void hexdump(char* buffer, size_t len){
-        printf("\n");
-        for (size_t i = 0; i < len; i++){
-            printf("%02X ", *(buffer+i));
-        }
-        printf("\n");
-    }
+std::shared_ptr<ClientData> ClientData::New(char *buffer, size_t len) {
+    uint64_t s_id;
+    int8_t td;
+    uint32_t event;
+    memcpy(&s_id, buffer, 8);
+    memcpy(&td, buffer + 8, 1);
+    memcpy(&event, buffer + 9, 4);
+    char* pname = (char *)malloc(len-12);
+    memcpy(pname, buffer + 13, len - 13);
+    ClientDataPtr c_data = std::make_shared<ClientData>(
+            ntohll(s_id),
+            td,
+            ntohl(event),
+            std::string(pname)
+    );
+    free(pname);
+    return c_data;
 }
 
 ClientData::ClientData(uint64_t session_id, int8_t turn_direction, uint32_t next_event,
@@ -19,7 +26,8 @@ ClientData::ClientData(uint64_t session_id, int8_t turn_direction, uint32_t next
         session_id_(session_id),
         turn_direction_(turn_direction),
         next_event_(next_event),
-        player_name_(player_name) {};
+        player_name_(player_name),
+        game_id_(0) {};
 
 size_t ClientData::ToBuffer(char *buffer) {
     uint64_t s_id = htonll(session_id_);
@@ -43,6 +51,27 @@ size_t ServerData::ToBuffer(char *buffer) const {
         i += len;
     }
     return i;
+}
+
+std::shared_ptr<ServerData> ServerData::New(char *buffer, size_t len) {
+    uint16_t ptr = 0;
+    uint32_t game_id;
+    memcpy(&game_id, buffer, 4);
+    ptr = 4;
+    std::vector<EventPtr> events;
+    while (ptr < len) {
+        uint32_t event_len2;
+        memcpy(&event_len2, buffer + ptr, 4);
+        uint32_t event_len = ntohl(event_len2);
+        EventPtr e = Event::NewEvent(buffer+ptr, event_len + 8);
+        ptr += event_len + 8;
+        if (e) {
+            events.push_back(e);
+        } else {
+            break;
+        }
+    }
+    return std::make_shared<ServerData>(ntohl(game_id), std::move(events));
 }
 
 ClientDataPtr buffer_to_client_data(char *buffer, size_t len) {

@@ -6,6 +6,8 @@
 
 class ClientData {
 public:
+    static std::shared_ptr<ClientData> New(char *buffer, size_t len);
+
     ClientData(uint64_t session_id, int8_t turn_direction,
         uint32_t next_event, const std::string &player_name);
 
@@ -35,6 +37,8 @@ using ClientDataPtr = std::shared_ptr<ClientData>;
 
 class ServerData {
 public:
+    static std::shared_ptr<ServerData> New(char *buffer, size_t len);
+
     ServerData(uint32_t game_id, const std::vector<EventPtr> &events):
             game_id_(game_id), events_(events){};
 
@@ -49,8 +53,5 @@ private:
 };
 
 using ServerDataPtr = std::shared_ptr<ServerData>;
-
-ServerDataPtr buffer_to_server_data(char *buffer, size_t len);
-ClientDataPtr buffer_to_client_data(char* buffer, size_t len);
 
 #endif // DATA_STRUCTURES_H

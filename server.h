@@ -9,17 +9,7 @@
 #include "siktacka.h"
 #include "data_structures.h"
 
-const uint64_t kmicroseconds = 1000000;
-
-namespace {
-    void hexdump(char *buffer, size_t len) {
-        printf("\n");
-        for (size_t i = 0; i < len; i++) {
-            printf("%02X ", *(buffer + i));
-        }
-        printf("\n");
-    }
-}
+const int64_t kmicroseconds = 1000000;
 
 class PlayerData {
 public:
@@ -124,7 +114,7 @@ public:
     uint64_t session_id() const { return session_id_; }
     uint32_t addr() const { return addres_.sin_addr.s_addr; }
     uint16_t port() const { return addres_.sin_port; }
-    bool IsDisactive() const { return timestamp_ < GetTimestamp() - 2 * kmicroseconds; }
+    bool IsDisactive() const { return timestamp_ < (GetTimestamp() - 2 * kmicroseconds); }
     uint32_t next_event_no() const { return next_event_no_; }
     PlayerPtr player() const { return player_; }
 

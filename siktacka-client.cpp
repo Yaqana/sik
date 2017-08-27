@@ -1,11 +1,6 @@
 #include <algorithm>
-#include <stdlib.h>
 #include <netdb.h>
-#include <errno.h>
-#include <stdarg.h>
 #include <poll.h>
-#include <string>
-#include <lzma.h>
 #include <cstring>
 #include <iostream>
 #include <zconf.h>
@@ -14,13 +9,13 @@
 #include "data_structures.h"
 
 namespace {
-    constexpr int UI = 0;
-    constexpr int SERVER = 1;
-    constexpr int SEND_INTERVAL_ms = 20; // co ile wysylany jest komunikat
-    constexpr int SEND_INTERVAL_us = 20000;
-    constexpr int LEFT = -1;
-    constexpr int AHEAD = 0;
-    constexpr int RIGHT = 1;
+    const int UI = 0;
+    const int SERVER = 1;
+    const int SEND_INTERVAL_ms = 20;
+    const int SEND_INTERVAL_us = 20000;
+    const int LEFT = -1;
+    const int AHEAD = 0;
+    const int RIGHT = 1;
     std::vector<std::string> players;
     std::queue<EventPtr> events;
     std::string player_name, server;
@@ -106,12 +101,12 @@ int ServerSend(struct sockaddr_in *server_address){
 void ServerRead(int sock, struct sockaddr_in *server_address) {
     socklen_t rcva_len = (socklen_t) sizeof (server_address);
     int flags = 0;
-    char buffer2[SERVER_TO_CLIENT_SIZE];
-    ssize_t len = recvfrom(sock, buffer2, SERVER_TO_CLIENT_SIZE, flags,
+    char buffer[SERVER_TO_CLIENT_SIZE];
+    ssize_t len = recvfrom(sock, buffer, SERVER_TO_CLIENT_SIZE, flags,
                            (struct sockaddr *) &server_address, &rcva_len);
     if (len < 0)
         syserr("error on datagram from client socket");
-    ServerDataPtr data = buffer_to_server_data(buffer2, (size_t)len);
+    ServerDataPtr data = ServerData::New(buffer, (size_t)len);
     if (cdata->game_id() == 0){
         cdata->set_game_id (data->game_id());
     } else if (cdata->game_id() != data->game_id()) {

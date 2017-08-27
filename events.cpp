@@ -4,15 +4,6 @@
 #include "events.h"
 #include "siktacka.h"
 
-namespace {
-    // TODO remove
-    void hexdump(char* buffer, size_t len){
-        for (size_t i = 0; i < len; i++){
-            printf("%02X ", *(buffer+i));
-        }
-    }
-}
-
 EventPtr Event::NewEvent(char *buffer, size_t len) {
     uint32_t ptr = 4; // skipping len field (already parsed)
     uint32_t ev_no = 0;
@@ -43,7 +34,9 @@ EventPtr Event::NewEvent(char *buffer, size_t len) {
         case 3: {
             return GameOver::New(ntohl(ev_no));
         }
-        default: return nullptr;
+        default: {
+            return nullptr;
+        }
     }
 }
 

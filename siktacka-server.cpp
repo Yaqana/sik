@@ -1,10 +1,5 @@
 #include <algorithm>
-#include <cstdint>
 #include <getopt.h>
-#include <cctype>
-#include <cstdlib>
-#include <cstdio>
-#include <iostream>
 #include <unordered_map>
 #include <poll.h>
 #include <queue>
@@ -18,7 +13,6 @@ extern int optind, opterr, optopt;
 namespace {
 
     std::set<std::shared_ptr<Client>> clients;
-    uint32_t had_game_over = 0;
 
     std::shared_ptr<GameState> gstate;
 
@@ -36,7 +30,7 @@ namespace {
         char *temp = string;
         while (*temp) {
             if (!isdigit(*temp))
-                fatal("%s powinien byc liczba dodatnia \n", string);
+                fatal("expect %s to be positive integer\n", string);
             temp++;
         }
         return atoi(string);
@@ -72,7 +66,7 @@ namespace {
                 case 'p':
                     p = IsPositiveInt(optarg);
                     if (p > 65535)
-                        fatal("niepoprawny port %d \n", p);
+                        fatal("Invalid port number %d \n", p);
                     port = (uint16_t) p;
                     break;
                 case 's':
@@ -85,7 +79,7 @@ namespace {
                     seed = (uint32_t) IsPositiveInt(optarg);
                     break;
                 default: /* '?' */
-                    fatal("niepoprawna flaga %c \n", opt);
+                    fatal("Unknown flag %c \n", opt);
             }
         }
         wait_time_us = 1000000 / speed;
@@ -154,7 +148,7 @@ namespace {
         int flags = 0;
         len = recvfrom(sock, buffer, sizeof(buffer), flags,
                        (struct sockaddr *) &client_address, &rcva_len);
-        ClientDataPtr c = buffer_to_client_data(buffer, len);
+        ClientDataPtr c = ClientData::New(buffer, (size_t )len);
         ProcessCdata(client_address, c);
     }
 
@@ -165,7 +159,7 @@ namespace {
         int ret, to_wait;
         to_wait = wait_time_ms;
         int64_t next_send = GetTimestamp() + wait_time_us;
-        while(true) { // TODO
+        while(true) {
             client.revents = 0;
             ret = poll(&client, 1, to_wait);
             if (ret < 1) {
