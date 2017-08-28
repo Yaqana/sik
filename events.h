@@ -8,17 +8,23 @@
 
 class Event {
 public:
-    static std::shared_ptr<Event> NewEvent(char* buffer, size_t len);
+    static std::shared_ptr<Event> NewEvent(char *buffer, size_t len);
 
     size_t ToServerBuffer(char *buffer) const;
+
     virtual size_t ToGuiBuffer(char *buffer) const = 0;
 
     virtual void MapName(const std::vector<std::string> &players) {}
 
     uint32_t event_no() { return event_no_; }
+
     uint32_t len() const { return len_; }
-    virtual std::vector<std::string> players() const { return std::vector<std::string>(); }
+
+    virtual std::vector<std::string>
+    players() const { return std::vector<std::string>(); }
+
     virtual bool IsGameOver() const { return false; };
+
     virtual bool IsNewGame() const { return false; }
 
 protected:
@@ -28,20 +34,23 @@ protected:
     uint32_t event_no_;
 
 private:
-        virtual size_t DataToBuffer(char *buffer) const = 0;
+    virtual size_t DataToBuffer(char *buffer) const = 0;
 };
 
 using EventPtr = std::shared_ptr<Event>;
 
-class NewGame: public Event {
+class NewGame : public Event {
 public:
-    static std::shared_ptr<NewGame> New(char* buffer, size_t len, uint32_t event_no);
+    static std::shared_ptr<NewGame>
+    New(char *buffer, size_t len, uint32_t event_no);
 
-    NewGame(uint32_t maxx, uint32_t maxy, const std::vector<std::string> &players, uint32_t event_no);
+    NewGame(uint32_t maxx, uint32_t maxy,
+            const std::vector<std::string> &players, uint32_t event_no);
 
     bool IsNewGame() const override { return true; }
 
     size_t ToGuiBuffer(char *buffer) const override;
+
     std::vector<std::string> players() const { return players_; }
 
 protected:
@@ -55,14 +64,17 @@ private:
     std::vector<std::string> players_;
 };
 
-class Pixel: public Event {
+class Pixel : public Event {
 public:
-    static std::shared_ptr<Pixel> New(char* buffer, size_t len, uint32_t event_no);
+    static std::shared_ptr<Pixel>
+    New(char *buffer, size_t len, uint32_t event_no);
 
     Pixel(uint32_t x, uint32_t y, uint8_t number, uint32_t event_no);
+
     Pixel() = delete;
 
-    void MapName(const std::vector<std::string> &players) override ;
+    void MapName(const std::vector<std::string> &players) override;
+
     size_t ToGuiBuffer(char *buffer) const override;
 
 protected:
@@ -77,18 +89,22 @@ private:
     std::string player_name_;
 };
 
-class PlayerEliminated: public Event {
+class PlayerEliminated : public Event {
 public:
-    static std::shared_ptr<PlayerEliminated> New(char* buffer, size_t len, uint32_t event_no);
+    static std::shared_ptr<PlayerEliminated>
+    New(char *buffer, size_t len, uint32_t event_no);
 
     PlayerEliminated(uint8_t player_numer, uint32_t event_no);
+
     PlayerEliminated() = delete;
 
-    void MapName(const std::vector<std::string> &players) override ;
+    void MapName(const std::vector<std::string> &players) override;
+
     size_t ToGuiBuffer(char *buffer) const override;
 
 protected:
     uint8_t EventType() const override { return 2; }
+
 private:
     size_t DataToBuffer(char *buffer) const override;
 
@@ -96,11 +112,12 @@ private:
     std::string player_name_;
 };
 
-class GameOver: public Event {
+class GameOver : public Event {
 public:
     static std::shared_ptr<GameOver> New(uint32_t event_no);
 
-    GameOver(uint32_t event_no) { event_no_ = event_no;};
+    GameOver(uint32_t event_no) { event_no_ = event_no; };
+
     GameOver() = delete;
 
     size_t ToGuiBuffer(char *buffer) const;

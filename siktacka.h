@@ -18,7 +18,9 @@
 #define ntohll(x) ((1==ntohl(1)) ? (x) : ((uint64_t)ntohl((x) & 0xFFFFFFFF) << 32) | ntohl((x) >> 32))
 
 uint32_t GetCrc(char *buffer, size_t len);
+
 int64_t GetTimestamp();
+
 uint16_t ValidatePort(const std::string &port);
 
 

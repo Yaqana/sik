@@ -16,20 +16,20 @@ EventPtr Event::NewEvent(char *buffer, size_t len) {
     uint32_t expected_crc = GetCrc(buffer, len - 4);
     uint32_t real_crc;
     memcpy(&real_crc, buffer + len - 4, 4);
-    if (ntohl(real_crc) != expected_crc){
+    if (ntohl(real_crc) != expected_crc) {
         return nullptr;
     }
 
-    size_t event_len = len - ptr -4;
+    size_t event_len = len - ptr - 4;
     switch (event_type) {
-        case 0:  {
-            return NewGame::New(buffer+ptr, event_len, ntohl(ev_no));
+        case 0: {
+            return NewGame::New(buffer + ptr, event_len, ntohl(ev_no));
         }
         case 1: {
-            return Pixel::New(buffer+ptr, event_len, ntohl(ev_no));
+            return Pixel::New(buffer + ptr, event_len, ntohl(ev_no));
         }
         case 2: {
-            return PlayerEliminated::New(buffer+ptr, event_len, ntohl(ev_no));
+            return PlayerEliminated::New(buffer + ptr, event_len, ntohl(ev_no));
         }
         case 3: {
             return GameOver::New(ntohl(ev_no));
@@ -44,8 +44,8 @@ size_t Event::ToServerBuffer(char *buffer) const {
     uint32_t event_no = htonl(event_no_);
     uint8_t ev_type = EventType();
 
-    memcpy(buffer+4, &event_no, 4);
-    memcpy(buffer+8, &ev_type, 1);
+    memcpy(buffer + 4, &event_no, 4);
+    memcpy(buffer + 8, &ev_type, 1);
 
     uint32_t len = 5; // length of event_ fields
     len += DataToBuffer(buffer + 9);
@@ -61,7 +61,8 @@ size_t Event::ToServerBuffer(char *buffer) const {
 }
 
 
-NewGame::NewGame(uint32_t maxx, uint32_t maxy, const std::vector<std::string> &players, uint32_t event_no)
+NewGame::NewGame(uint32_t maxx, uint32_t maxy,
+                 const std::vector<std::string> &players, uint32_t event_no)
         : maxx_(maxx), maxy_(maxy), players_(players) {
     event_no_ = event_no;
     len_ += 8;
@@ -69,7 +70,8 @@ NewGame::NewGame(uint32_t maxx, uint32_t maxy, const std::vector<std::string> &p
         len_ += p.size() + 1;
 };
 
-std::shared_ptr<NewGame> NewGame::New(char *buffer, size_t len, uint32_t event_no) {
+std::shared_ptr<NewGame>
+NewGame::New(char *buffer, size_t len, uint32_t event_no) {
     size_t ptr = 0;
 
     uint32_t x, y;
@@ -81,7 +83,8 @@ std::shared_ptr<NewGame> NewGame::New(char *buffer, size_t len, uint32_t event_n
     size_t count = 0;
     std::vector<std::string> players;
     while (ptr < len) { // CRC
-        while (*(buffer + ptr + count) >= 33 && *(buffer + ptr + count) <= 126) {
+        while (*(buffer + ptr + count) >= 33 &&
+               *(buffer + ptr + count) <= 126) {
             count += 1;
         }
         std::string player;
@@ -103,12 +106,12 @@ size_t NewGame::DataToBuffer(char *buffer) const {
     uint32_t maxy = htonl(maxy_);
 
     memcpy(buffer, &maxx, 4);
-    memcpy(buffer+4, &maxy, 4);
+    memcpy(buffer + 4, &maxy, 4);
     len = 8;
 
     for (auto &p : players_) {
-        const char* pname = p.c_str();
-        memcpy(buffer+len, pname, p.length() + 1);
+        const char *pname = p.c_str();
+        memcpy(buffer + len, pname, p.length() + 1);
         len += p.length() + 1;
     }
 
@@ -160,18 +163,19 @@ size_t Pixel::ToGuiBuffer(char *buffer) const {
     return strlen(buffer);
 }
 
-void Pixel::MapName(const std::vector<std::string> &players){
+void Pixel::MapName(const std::vector<std::string> &players) {
     if (playerNumber_ < players.size())
         player_name_ = players[playerNumber_];
 }
 
 PlayerEliminated::PlayerEliminated(uint8_t player_numer, uint32_t event_no)
-        : playerNumber_(player_numer){
+        : playerNumber_(player_numer) {
     event_no_ = event_no;
     len_ += 1;
 }
 
-std::shared_ptr<PlayerEliminated> PlayerEliminated::New(char *buffer, size_t len, uint32_t event_no) {
+std::shared_ptr<PlayerEliminated>
+PlayerEliminated::New(char *buffer, size_t len, uint32_t event_no) {
     uint8_t playerNumber;
     memcpy(&playerNumber, buffer, 1);
     return std::make_shared<PlayerEliminated>(playerNumber, event_no);
@@ -187,7 +191,7 @@ size_t PlayerEliminated::ToGuiBuffer(char *buffer) const {
     return strlen(buffer);
 }
 
-void PlayerEliminated::MapName(const std::vector<std::string> &players){
+void PlayerEliminated::MapName(const std::vector<std::string> &players) {
     if (playerNumber_ < players.size())
         player_name_ = players[playerNumber_];
 }

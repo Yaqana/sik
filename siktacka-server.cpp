@@ -8,7 +8,6 @@
 #include "server.h"
 
 extern char *optarg;
-extern int optind, opterr, optopt;
 
 namespace {
 
@@ -34,22 +33,6 @@ namespace {
             temp++;
         }
         return atoi(string);
-    }
-
-    void UpdateClients() {
-        for (auto c: clients) {
-            if (c->IsDisactive()) {
-                clients.erase(c);
-                gstate->RemovePlayer(c->player());
-                continue;
-            }
-            if (gstate->is_pending()) {
-                std::vector<ServerDataPtr> sdata_to_send = gstate->EventsToSend(c->next_event_no());
-                for (auto &s: sdata_to_send) {
-                    c->SendTo(s, sock);
-                }
-            }
-        }
     }
 
     void ParseArguments(int argc, char **argv) {
@@ -86,13 +69,31 @@ namespace {
         wait_time_ms = wait_time_us / 1000;
     }
 
+    void UpdateClients() {
+        for (auto c: clients) {
+            if (c->IsDisactive()) {
+                clients.erase(c);
+                gstate->RemovePlayer(c->player());
+                continue;
+            }
+            if (gstate->is_pending()) {
+                std::vector<ServerDataPtr> sdata_to_send = gstate->EventsToSend(
+                        c->next_event_no());
+                for (auto &s: sdata_to_send) {
+                    c->SendTo(s, sock);
+                }
+            }
+        }
+    }
+
     void UdpSocket() {
         sock = socket(AF_INET, SOCK_DGRAM, 0);
         if (sock < 0)
             syserr("socket");
         struct sockaddr_in my_address;
         my_address.sin_family = AF_UNSPEC; // IPv4 and IPv6
-        my_address.sin_addr.s_addr = htonl(INADDR_ANY); // listening on all interfaces
+        my_address.sin_addr.s_addr = htonl(
+                INADDR_ANY); // listening on all interfaces
         my_address.sin_port = htons(port);
 
         if (bind(sock, (struct sockaddr *) &my_address,
@@ -101,14 +102,16 @@ namespace {
 
     }
 
-    void ProcessCdata(const struct sockaddr_in &player_address, ClientDataPtr data) {
+    void
+    ProcessCdata(const struct sockaddr_in &player_address, ClientDataPtr data) {
 
         bool new_client = true;
         std::shared_ptr<Client> client;
 
         // check if the client is new
         for (auto c: clients) {
-            if (c->addr() == player_address.sin_addr.s_addr && c->port() == player_address.sin_port) {
+            if (c->addr() == player_address.sin_addr.s_addr &&
+                c->port() == player_address.sin_port) {
                 if (c->session_id() > data->session_id()) { // Old datagram
                     return;
                 }
@@ -120,7 +123,8 @@ namespace {
 
         // valid new client
         if (new_client) {
-            client = std::make_shared<Client>(player_address, data->session_id());
+            client = std::make_shared<Client>(player_address,
+                                              data->session_id());
             clients.insert(client);
         }
 
@@ -128,12 +132,13 @@ namespace {
         client->set_next_event_no(data->next_event());
 
         PlayerPtr player = gstate->ProcessData(data, client->player());
-        if (player){
+        if (player) {
             client->set_player(player);
         }
 
-        std::vector<ServerDataPtr> sdata_to_send = gstate->EventsToSend(data->next_event());
-        for (auto &s: sdata_to_send){
+        std::vector<ServerDataPtr> sdata_to_send = gstate->EventsToSend(
+                data->next_event());
+        for (auto &s: sdata_to_send) {
             client->SendTo(s, sock);
         }
 
@@ -148,7 +153,7 @@ namespace {
         int flags = 0;
         len = recvfrom(sock, buffer, sizeof(buffer), flags,
                        (struct sockaddr *) &client_address, &rcva_len);
-        ClientDataPtr c = ClientData::New(buffer, (size_t )len);
+        ClientDataPtr c = ClientData::New(buffer, (size_t) len);
         ProcessCdata(client_address, c);
     }
 
@@ -159,35 +164,30 @@ namespace {
         int ret, to_wait;
         to_wait = wait_time_ms;
         int64_t next_send = GetTimestamp() + wait_time_us;
-        while(true) {
+        while (true) {
             client.revents = 0;
             ret = poll(&client, 1, to_wait);
             if (ret < 1) {
                 next_send = GetTimestamp() + wait_time_us;
                 to_wait = wait_time_ms;
-                if(gstate->active())
+                if (gstate->active())
                     gstate->NextTurn();
                 UpdateClients();
                 gstate->ResetIfGameOver();
-            }
-            else {
+            } else {
                 if (client.revents & POLLIN) {
                     ReadFromClient();
                 }
-                    /*
-                else if (client.revents & POLLOUT) {
-                    write_to_client();
-                    client.events = POLLIN;
-                } */
-                to_wait = std::max((next_send - GetTimestamp())/1000, (int64_t )0);
+                to_wait = std::max((next_send - GetTimestamp()) / 1000,
+                                   (int64_t) 0);
             }
         }
     }
+} // namespace
 
-}
 int main(int argc, char *argv[]) {
 
-    seed = (uint64_t)time(NULL);
+    seed = (uint64_t) time(NULL);
 
     ParseArguments(argc, argv);
 

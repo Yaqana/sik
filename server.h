@@ -18,20 +18,33 @@ public:
             player_name_(player_name), number_(number) {};
 
     void Move(uint32_t turningSpeed);
+
     void Activate() { active_ = true; }
-    void Disactivate() {active_ = false;}
+
+    void Disactivate() { active_ = false; }
 
     void set_turn_dir(int8_t turn_dir) { turn_dir_ = turn_dir; }
+
     void set_head_x(double x) { head_x_ = x; }
-    void set_head_y(double y) { head_y_= y; }
+
+    void set_head_y(double y) { head_y_ = y; }
+
     void set_move_dir(uint32_t move_dir) { move_dir_ = move_dir; }
+
     void set_number(uint8_t number) { number_ = number; }
 
     std::string player_name() const { return player_name_; }
+
     double head_x() const { return head_x_; }
+
     double head_y() const { return head_y_; }
-    std::pair<int, int> pixel() const { return std::make_pair((int)head_x_, (int)head_y_); }
+
+    std::pair<int, int> pixel() const {
+        return std::make_pair((int) head_x_, (int) head_y_);
+    }
+
     bool active() const { return active_; }
+
     uint8_t number() const { return number_; }
 
 
@@ -66,9 +79,11 @@ private:
 
 class GameState {
 public:
-    GameState(uint64_t rand_seed, uint32_t maxx, uint32_t maxy, uint32_t turningSpeed);
+    GameState(uint64_t rand_seed, uint32_t maxx, uint32_t maxy,
+              uint32_t turningSpeed);
 
     void NextTurn();
+
     void ResetIfGameOver();
 
     // Returns pointer to new client if one was created and nullptr otherwise.
@@ -77,16 +92,24 @@ public:
     void RemovePlayer(PlayerPtr player);
 
     std::vector<ServerDataPtr> EventsToSend(uint32_t firstEvent);
+
     bool active() const { return active_; }
+
     bool is_pending() const { return is_pending_; }
 
 private:
     uint64_t Rand() { return rand_.Next(); }
+
     PlayerPtr NewPlayer(const std::string &player_name);
+
     void StartGame();
+
     void EliminatePlayer(PlayerPtr player);
+
     void EndGame();
+
     void ResetPlayers();
+
     Random rand_;
 
     uint32_t gid_;
@@ -104,23 +127,33 @@ private:
 };
 
 
-class Client{
+class Client {
 public:
-    Client(const struct sockaddr_in &addres, uint64_t session_id):
+    Client(const struct sockaddr_in &addres, uint64_t session_id) :
             addres_(addres), session_id_(session_id) {};
 
     void SendTo(ServerDataPtr server_data, int sock);
 
     uint64_t session_id() const { return session_id_; }
+
     uint32_t addr() const { return addres_.sin_addr.s_addr; }
+
     uint16_t port() const { return addres_.sin_port; }
-    bool IsDisactive() const { return timestamp_ < (GetTimestamp() - 2 * kmicroseconds); }
+
+    bool IsDisactive() const {
+        return timestamp_ < (GetTimestamp() - 2 * kmicroseconds);
+    }
+
     uint32_t next_event_no() const { return next_event_no_; }
+
     PlayerPtr player() const { return player_; }
 
     void set_timestamp(int64_t timestamp) { timestamp_ = timestamp; }
-    void set_next_event_no (uint32_t next_event_no) { next_event_no_ = next_event_no; }
-    void set_player (PlayerPtr player) { player_ = player; }
+
+    void set_next_event_no(
+            uint32_t next_event_no) { next_event_no_ = next_event_no; }
+
+    void set_player(PlayerPtr player) { player_ = player; }
 
 
 private:
